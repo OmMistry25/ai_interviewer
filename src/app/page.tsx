@@ -22,12 +22,20 @@ export default async function Home() {
               <div className="p-4 bg-zinc-800 rounded space-y-2">
                 <p className="text-green-400">Organization: {org.name}</p>
                 <p className="text-zinc-500 text-sm">Role: {org.role}</p>
-                <Link
-                  href="/admin/templates"
-                  className="inline-block px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 text-sm"
-                >
-                  Manage Templates
-                </Link>
+                <div className="flex gap-2">
+                  <Link
+                    href="/admin/templates"
+                    className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 text-sm"
+                  >
+                    Templates
+                  </Link>
+                  <Link
+                    href="/admin/interviews"
+                    className="px-4 py-2 rounded bg-green-600 text-white hover:bg-green-700 text-sm"
+                  >
+                    Interviews
+                  </Link>
+                </div>
               </div>
             ) : (
               <form action={createOrganization} className="space-y-2">
