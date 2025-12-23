@@ -19,9 +19,15 @@ export default async function Home() {
             <p className="text-zinc-400">Logged in as {session.user.email}</p>
             
             {org ? (
-              <div className="p-4 bg-zinc-800 rounded">
+              <div className="p-4 bg-zinc-800 rounded space-y-2">
                 <p className="text-green-400">Organization: {org.name}</p>
                 <p className="text-zinc-500 text-sm">Role: {org.role}</p>
+                <Link
+                  href="/admin/templates"
+                  className="inline-block px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 text-sm"
+                >
+                  Manage Templates
+                </Link>
               </div>
             ) : (
               <form action={createOrganization} className="space-y-2">
