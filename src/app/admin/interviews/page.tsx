@@ -72,11 +72,19 @@ export default async function InterviewsPage() {
                       </span>
                     </p>
                   </div>
-                  <div className="text-right">
-                    <p className="text-zinc-500 text-xs mb-1">Interview Link:</p>
-                    <code className="text-xs bg-zinc-700 px-2 py-1 rounded text-zinc-300">
-                      /candidate/interview/{interview.access_token}
-                    </code>
+                  <div className="text-right space-y-2">
+                    <div>
+                      <p className="text-zinc-500 text-xs mb-1">Interview Link:</p>
+                      <code className="text-xs bg-zinc-700 px-2 py-1 rounded text-zinc-300">
+                        /candidate/interview/{interview.access_token}
+                      </code>
+                    </div>
+                    <Link
+                      href={`/admin/interviews/${interview.id}`}
+                      className="inline-block px-3 py-1 text-xs rounded bg-zinc-700 text-white hover:bg-zinc-600"
+                    >
+                      View Details
+                    </Link>
                   </div>
                 </div>
               </div>

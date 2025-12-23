@@ -38,6 +38,9 @@ export function TemplateEditor({
     setPublishing(true);
 
     try {
+      // Save first, then publish
+      const parsed = JSON.parse(jsonText);
+      await updateTemplateVersion(versionId, parsed);
       await publishTemplateVersion(versionId);
       window.location.reload();
     } catch (e) {

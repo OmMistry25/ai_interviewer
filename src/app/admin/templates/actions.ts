@@ -1,6 +1,5 @@
 "use server";
 
-import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { validateTemplateConfig } from "@/lib/interview/validator";
 import { getCurrentOrg } from "@/lib/supabase/helpers";
@@ -68,20 +67,41 @@ export async function updateTemplateVersion(
 ): Promise<void> {
   const validatedConfig = validateTemplateConfig(config);
 
-  const supabase = await createSupabaseServerClient();
+  // Verify user has access
+  const org = await getCurrentOrg();
+  if (!org) {
+    throw new Error("No organization found");
+  }
 
-  // Check if version is already published
-  const { data: version } = await supabase
+  const adminClient = createSupabaseAdminClient();
+
+  // Get version
+  const { data: version } = await adminClient
     .from("interview_template_versions")
-    .select("published_at")
+    .select("published_at, template_id")
     .eq("id", versionId)
     .single();
 
-  if (version?.published_at) {
+  if (!version) {
+    throw new Error("Version not found");
+  }
+
+  // Get template to verify org
+  const { data: template } = await adminClient
+    .from("interview_templates")
+    .select("org_id")
+    .eq("id", version.template_id)
+    .single();
+
+  if (!template || template.org_id !== org.orgId) {
+    throw new Error("Unauthorized");
+  }
+
+  if (version.published_at) {
     throw new Error("Cannot update a published version");
   }
 
-  const { error } = await supabase
+  const { error } = await adminClient
     .from("interview_template_versions")
     .update({ config: validatedConfig })
     .eq("id", versionId);
@@ -94,10 +114,16 @@ export async function updateTemplateVersion(
 }
 
 export async function publishTemplateVersion(versionId: string): Promise<void> {
-  const supabase = await createSupabaseServerClient();
+  // Verify user has access
+  const org = await getCurrentOrg();
+  if (!org) {
+    throw new Error("No organization found");
+  }
 
-  // Get the version to find template_id
-  const { data: version, error: fetchError } = await supabase
+  const adminClient = createSupabaseAdminClient();
+
+  // Get version
+  const { data: version, error: fetchError } = await adminClient
     .from("interview_template_versions")
     .select("template_id, config, published_at")
     .eq("id", versionId)
@@ -107,14 +133,23 @@ export async function publishTemplateVersion(versionId: string): Promise<void> {
     throw new Error("Version not found");
   }
 
+  // Get template to verify org
+  const { data: template } = await adminClient
+    .from("interview_templates")
+    .select("org_id")
+    .eq("id", version.template_id)
+    .single();
+
+  if (!template || template.org_id !== org.orgId) {
+    throw new Error("Unauthorized");
+  }
+
   if (version.published_at) {
     throw new Error("Version is already published");
   }
 
   // Validate config before publishing
   validateTemplateConfig(version.config);
-
-  const adminClient = createSupabaseAdminClient();
 
   // Set published_at
   const { error: publishError } = await adminClient
@@ -138,4 +173,3 @@ export async function publishTemplateVersion(versionId: string): Promise<void> {
 
   revalidatePath("/admin/templates");
 }
-
