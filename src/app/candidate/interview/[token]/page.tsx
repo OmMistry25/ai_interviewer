@@ -41,14 +41,10 @@ export default async function CandidateInterviewPage({
   return (
     <div className="min-h-screen bg-zinc-900 p-8">
       <div className="max-w-4xl mx-auto">
-        <div className="mb-8 text-center">
-          <h1 className="text-2xl font-bold text-white">
-            Welcome, {session.candidateName}
-          </h1>
-          <p className="text-zinc-400">Your interview will begin shortly</p>
-        </div>
-
-        <InterviewRoom interviewToken={token} />
+        <InterviewRoom 
+          interviewToken={token} 
+          candidateName={session.candidateName} 
+        />
       </div>
     </div>
   );

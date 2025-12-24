@@ -32,9 +32,21 @@ const policiesSchema = z.object({
   min_answer_seconds: z.number().min(0).optional().default(6),
 });
 
+// Role context for evaluation
+const roleContextSchema = z.object({
+  job_title: z.string().min(1),
+  department: z.string().optional(),
+  level: z.string().optional(), // e.g., "junior", "mid", "senior", "lead"
+  required_skills: z.array(z.string()).optional().default([]),
+  preferred_experience: z.string().optional(), // e.g., "3+ years in SaaS sales"
+  company_context: z.string().optional(), // e.g., "Fast-paced AI startup"
+  evaluation_notes: z.string().optional(), // Any specific guidance for evaluators
+});
+
 // Full template config
 export const templateConfigSchema = z.object({
   system_prompt: z.string().min(1),
+  role_context: roleContextSchema.optional(),
   voice: voiceSchema.optional().default({ voice_id: "neutral", speed: 1.0 }),
   questions: z.array(questionSchema).min(1),
   policies: policiesSchema.optional().default({
@@ -44,6 +56,7 @@ export const templateConfigSchema = z.object({
 });
 
 export type TemplateConfig = z.infer<typeof templateConfigSchema>;
+export type RoleContext = z.infer<typeof roleContextSchema>;
 export type Question = z.infer<typeof questionSchema>;
 export type Rubric = z.infer<typeof rubricSchema>;
 export type Followup = z.infer<typeof followupSchema>;

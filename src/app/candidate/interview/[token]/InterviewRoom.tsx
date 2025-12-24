@@ -6,6 +6,7 @@ import { speakText } from "@/lib/audio/tts-client";
 
 interface InterviewRoomProps {
   interviewToken: string;
+  candidateName: string;
 }
 
 interface RtcCredentials {
@@ -31,7 +32,7 @@ interface CurrentQuestion {
   total: number;
 }
 
-export function InterviewRoom({ interviewToken }: InterviewRoomProps) {
+export function InterviewRoom({ interviewToken, candidateName }: InterviewRoomProps) {
   const [credentials, setCredentials] = useState<RtcCredentials | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [phase, setPhase] = useState<InterviewPhase>("not_started");
@@ -268,39 +269,48 @@ export function InterviewRoom({ interviewToken }: InterviewRoomProps) {
 
   if (phase === "not_started") {
     return (
-      <div className="p-8 bg-zinc-800 rounded text-center">
-        <p className="text-zinc-300 mb-4">
-          When you&apos;re ready, click below to start your interview.
-        </p>
-        <p className="text-zinc-500 text-sm mb-6">
-          Make sure your camera and microphone are working.
-        </p>
-        <button
-          onClick={startInterview}
-          className="px-8 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700"
-        >
-          Start Interview
-        </button>
+      <div className="text-center">
+        <div className="mb-8">
+          <h1 className="text-2xl font-bold text-white">Welcome, {candidateName}</h1>
+          <p className="text-zinc-400">Your interview will begin shortly</p>
+        </div>
+        <div className="p-8 bg-zinc-800 rounded">
+          <p className="text-zinc-300 mb-4">
+            When you&apos;re ready, click below to start your interview.
+          </p>
+          <p className="text-zinc-500 text-sm mb-6">
+            Make sure your camera and microphone are working.
+          </p>
+          <button
+            onClick={startInterview}
+            className="px-8 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700"
+          >
+            Start Interview
+          </button>
+        </div>
       </div>
     );
   }
 
   if (phase === "completed") {
     return (
-      <div className="p-8 bg-zinc-800 rounded text-center">
-        <h2 className="text-2xl font-bold text-green-400 mb-4">
-          Interview Complete!
-        </h2>
-        <p className="text-zinc-300 mb-6">
-          Thank you for completing the interview. We will review your responses
-          and be in touch soon.
-        </p>
-        <div className="text-left max-h-64 overflow-y-auto bg-zinc-900 p-4 rounded">
-          {transcript.map((line, i) => (
-            <p key={i} className="text-zinc-400 text-sm mb-1">
-              {line}
-            </p>
-          ))}
+      <div className="text-center">
+        <div className="mb-8">
+          <h1 className="text-2xl font-bold text-green-400">Interview Complete!</h1>
+          <p className="text-zinc-400">Thank you, {candidateName}</p>
+        </div>
+        <div className="p-8 bg-zinc-800 rounded">
+          <p className="text-zinc-300 mb-6">
+            We will review your responses and be in touch soon.
+          </p>
+          <div className="text-left max-h-64 overflow-y-auto bg-zinc-900 p-4 rounded">
+            <p className="text-zinc-500 text-xs mb-2">Interview Summary</p>
+            {transcript.map((line, i) => (
+              <p key={i} className="text-zinc-400 text-sm mb-1">
+                {line}
+              </p>
+            ))}
+          </div>
         </div>
       </div>
     );
@@ -308,6 +318,11 @@ export function InterviewRoom({ interviewToken }: InterviewRoomProps) {
 
   return (
     <div className="space-y-4">
+      <div className="text-center mb-4">
+        <h1 className="text-2xl font-bold text-white">{candidateName}</h1>
+        <p className="text-zinc-400">Interview in progress</p>
+      </div>
+      
       {credentials && (
         <VideoRoom
           token={credentials.token}

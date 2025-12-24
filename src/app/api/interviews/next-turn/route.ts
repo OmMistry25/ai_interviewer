@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
     const evaluation = await evaluateAnswer(
       currentQuestion,
       candidateAnswer,
-      state.config.system_prompt
+      state.config
     );
 
     // Store the evaluation score for this question
@@ -67,50 +67,50 @@ export async function POST(request: NextRequest) {
       .eq("interview_id", interviewId)
       .single();
 
-    const currentScores = (existingEval?.scores as Record<string, unknown>) || {
-      questionScores: {},
-      signals: {},
-    };
+    // Build scores structure
+    const existingScores = (existingEval?.scores as {
+      questionScores?: Record<string, number[]>;
+      signalTotals?: Record<string, { total: number; count: number; weight: number }>;
+    }) || {};
 
-    // Store the question score
-    const questionScores = (currentScores.questionScores as Record<string, number>) || {};
-    questionScores[questionId] = evaluation.score;
-
-    // Update signal aggregates
-    const signals = (currentScores.signals as Record<string, { total: number; count: number; weight: number }>) || {};
-    if (!signals[signal]) {
-      signals[signal] = { total: 0, count: 0, weight };
+    // Store all scores per question (for transparency)
+    const questionScores = existingScores.questionScores || {};
+    if (!questionScores[questionId]) {
+      questionScores[questionId] = [];
     }
-    signals[signal].total += evaluation.score;
-    signals[signal].count += 1;
+    questionScores[questionId].push(evaluation.score);
 
-    // Calculate total score
+    // Update signal aggregates (store raw totals, not calculated averages)
+    const signalTotals = existingScores.signalTotals || {};
+    if (!signalTotals[signal]) {
+      signalTotals[signal] = { total: 0, count: 0, weight };
+    }
+    signalTotals[signal].total += evaluation.score;
+    signalTotals[signal].count += 1;
+
+    // Calculate display scores
+    const signals: Record<string, { score: number; weight: number }> = {};
     let totalWeighted = 0;
     let totalWeight = 0;
-    for (const [, data] of Object.entries(signals)) {
-      const avg = data.count > 0 ? data.total / data.count : 0;
-      totalWeighted += avg * data.weight;
+    
+    for (const [sig, data] of Object.entries(signalTotals)) {
+      const avgScore = data.count > 0 ? data.total / data.count : 0;
+      signals[sig] = { score: avgScore, weight: data.weight };
+      totalWeighted += avgScore * data.weight;
       totalWeight += data.weight;
     }
+    
     const totalScore = totalWeight > 0 ? totalWeighted / totalWeight : 0;
 
-    // Upsert evaluation
+    // Upsert evaluation (store both raw totals for accumulation AND calculated scores for display)
     await adminClient.from("evaluations").upsert(
       {
         interview_id: interviewId,
         scores: {
           totalScore,
           questionScores,
-          signals: Object.fromEntries(
-            Object.entries(signals).map(([sig, data]) => [
-              sig,
-              {
-                score: data.count > 0 ? data.total / data.count : 0,
-                weight: data.weight,
-                count: data.count,
-              },
-            ])
-          ),
+          signals,
+          signalTotals, // Keep raw data for future accumulation
         },
       },
       { onConflict: "interview_id" }
