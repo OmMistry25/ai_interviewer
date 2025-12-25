@@ -24,7 +24,7 @@ export async function createTemplate(name: string) {
 
   // Create initial draft version
   const { error: versionError } = await supabase
-    .from("template_versions")
+    .from("interview_template_versions")
     .insert({
       template_id: template.id,
       version: 1,
@@ -57,7 +57,7 @@ export async function updateTemplateVersion(
   }
 
   const { error } = await supabase
-    .from("template_versions")
+    .from("interview_template_versions")
     .update({ config })
     .eq("id", versionId);
 
@@ -79,7 +79,7 @@ export async function publishTemplateVersion(versionId: string) {
 
   // Get the template_id for this version
   const { data: version } = await supabase
-    .from("template_versions")
+    .from("interview_template_versions")
     .select("template_id")
     .eq("id", versionId)
     .single();
@@ -90,14 +90,14 @@ export async function publishTemplateVersion(versionId: string) {
 
   // Unpublish any existing published versions
   await supabase
-    .from("template_versions")
+    .from("interview_template_versions")
     .update({ status: "archived" })
     .eq("template_id", version.template_id)
     .eq("status", "published");
 
   // Publish this version
   const { error } = await supabase
-    .from("template_versions")
+    .from("interview_template_versions")
     .update({ status: "published" })
     .eq("id", versionId);
 

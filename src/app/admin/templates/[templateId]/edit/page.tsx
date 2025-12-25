@@ -21,7 +21,7 @@ export default async function EditTemplatePage({ params }: Props) {
     .select(`
       id,
       name,
-      template_versions (
+      interview_template_versions (
         id,
         version,
         config,
@@ -37,7 +37,7 @@ export default async function EditTemplatePage({ params }: Props) {
     notFound();
   }
 
-  const versions = template.template_versions as Array<{
+  const versions = template.interview_template_versions as Array<{
     id: string;
     version: number;
     config: Record<string, unknown>;

@@ -23,7 +23,7 @@ export async function createInterview(formData: FormData) {
 
   // Get the published version of the template
   const { data: version } = await supabase
-    .from("template_versions")
+    .from("interview_template_versions")
     .select("id")
     .eq("template_id", templateId)
     .eq("status", "published")

@@ -17,12 +17,12 @@ export default async function NewJobPage() {
     .select(`
       id,
       name,
-      template_versions!inner (
+      interview_template_versions!inner (
         status
       )
     `)
     .eq("org_id", org.orgId)
-    .eq("template_versions.status", "published");
+    .eq("interview_template_versions.status", "published");
 
   return (
     <div className="min-h-screen bg-zinc-900 text-white p-8">

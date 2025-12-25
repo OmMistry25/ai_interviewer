@@ -18,13 +18,13 @@ export default async function InterviewsPage() {
     .select(`
       id,
       name,
-      template_versions!inner (
+      interview_template_versions!inner (
         id,
         status
       )
     `)
     .eq("org_id", org.orgId)
-    .eq("template_versions.status", "published");
+    .eq("interview_template_versions.status", "published");
 
   // Get recent interviews
   const { data: interviews } = await supabase
@@ -35,7 +35,7 @@ export default async function InterviewsPage() {
       candidate_email,
       status,
       created_at,
-      template_versions (
+      interview_template_versions (
         interview_templates (
           name
         )
@@ -68,7 +68,7 @@ export default async function InterviewsPage() {
           <h2 className="text-xl font-semibold">Recent Interviews</h2>
 
           {interviews?.map((interview) => {
-            const templateVersions = interview.template_versions as unknown as {
+            const templateVersions = interview.interview_template_versions as unknown as {
               interview_templates: { name: string } | null;
             } | null;
             const templateName = templateVersions?.interview_templates?.name || "Unknown";

@@ -36,7 +36,7 @@ export async function createJob(formData: FormData) {
   let templateVersionId = null;
   if (parsed.data.template_id) {
     const { data: version } = await supabase
-      .from("template_versions")
+      .from("interview_template_versions")
       .select("id")
       .eq("template_id", parsed.data.template_id)
       .eq("status", "published")
@@ -96,7 +96,7 @@ export async function updateJob(jobId: string, formData: FormData) {
   let templateVersionId = undefined;
   if (parsed.data.template_id) {
     const { data: version } = await supabase
-      .from("template_versions")
+      .from("interview_template_versions")
       .select("id")
       .eq("template_id", parsed.data.template_id)
       .eq("status", "published")

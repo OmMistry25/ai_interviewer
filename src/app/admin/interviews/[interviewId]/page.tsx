@@ -20,7 +20,7 @@ export default async function InterviewDetailPage({ params }: Props) {
     .from("interviews")
     .select(`
       *,
-      template_versions (
+      interview_template_versions (
         config,
         interview_templates (
           name
@@ -35,7 +35,7 @@ export default async function InterviewDetailPage({ params }: Props) {
     notFound();
   }
 
-  const templateVersions = interview.template_versions as unknown as {
+  const templateVersions = interview.interview_template_versions as unknown as {
     config: Record<string, unknown>;
     interview_templates: { name: string } | null;
   } | null;

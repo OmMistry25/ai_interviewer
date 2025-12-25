@@ -28,7 +28,7 @@ export default async function EditJobPage({ params }: Props) {
       hourly_rate_max,
       status,
       template_version_id,
-      template_versions (
+      interview_template_versions (
         template_id
       )
     `)
@@ -46,14 +46,14 @@ export default async function EditJobPage({ params }: Props) {
     .select(`
       id,
       name,
-      template_versions!inner (
+      interview_template_versions!inner (
         status
       )
     `)
     .eq("org_id", org.orgId)
-    .eq("template_versions.status", "published");
+    .eq("interview_template_versions.status", "published");
 
-  const templateVersion = job.template_versions as unknown as { template_id: string } | null;
+  const templateVersion = job.interview_template_versions as unknown as { template_id: string } | null;
 
   return (
     <div className="min-h-screen bg-zinc-900 text-white p-8">

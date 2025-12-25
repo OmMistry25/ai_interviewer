@@ -16,7 +16,7 @@ export default async function TemplatesPage() {
     .select(`
       id,
       name,
-      template_versions (
+      interview_template_versions (
         id,
         version,
         status,
@@ -41,7 +41,7 @@ export default async function TemplatesPage() {
 
         <div className="grid gap-4">
           {templates?.map((template) => {
-            const versions = template.template_versions as Array<{
+            const versions = template.interview_template_versions as Array<{
               id: string;
               version: number;
               status: string;
