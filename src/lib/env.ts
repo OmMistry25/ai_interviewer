@@ -8,6 +8,7 @@ export const env = createEnv({
     LIVEKIT_API_KEY: z.string().min(1),
     LIVEKIT_API_SECRET: z.string().min(1),
     OPENAI_API_KEY: z.string().min(1),
+    RESEND_API_KEY: z.string().min(1).optional(),
   },
   client: {
     NEXT_PUBLIC_SUPABASE_URL: z.string().url(),
@@ -23,6 +24,7 @@ export const env = createEnv({
     LIVEKIT_API_SECRET: process.env.LIVEKIT_API_SECRET,
     NEXT_PUBLIC_LIVEKIT_URL: process.env.NEXT_PUBLIC_LIVEKIT_URL,
     OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+    RESEND_API_KEY: process.env.RESEND_API_KEY,
   },
 });
 

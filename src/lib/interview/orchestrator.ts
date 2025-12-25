@@ -1,5 +1,6 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { TemplateConfig, Question } from "@/types/template";
+import { ResumeContext } from "./evaluator";
 
 export interface InterviewState {
   interviewId: string;
@@ -110,5 +111,49 @@ export async function completeInterview(interviewId: string): Promise<void> {
     .from("interviews")
     .update({ status: "completed", completed_at: new Date().toISOString() })
     .eq("id", interviewId);
+}
+
+/**
+ * Load resume context for an interview (if linked to an application)
+ */
+export async function loadResumeContext(
+  interviewId: string
+): Promise<ResumeContext | undefined> {
+  const adminClient = createSupabaseAdminClient();
+
+  // Get interview with application
+  const { data: interview } = await adminClient
+    .from("interviews")
+    .select("application_id")
+    .eq("id", interviewId)
+    .single();
+
+  if (!interview?.application_id) {
+    return undefined;
+  }
+
+  // Get application with resume analysis
+  const { data: application } = await adminClient
+    .from("applications")
+    .select("resume_analysis")
+    .eq("id", interview.application_id)
+    .single();
+
+  if (!application?.resume_analysis) {
+    return undefined;
+  }
+
+  // Return relevant fields for evaluation context
+  const analysis = application.resume_analysis as any;
+  return {
+    summary: analysis.summary,
+    skills: analysis.skills,
+    relevant_experience: analysis.relevant_experience,
+    interview_focus_areas: analysis.interview_focus_areas,
+    suggested_questions: analysis.suggested_questions,
+    fit_score: analysis.fit_score,
+    strengths: analysis.strengths,
+    concerns: analysis.concerns,
+  };
 }
 

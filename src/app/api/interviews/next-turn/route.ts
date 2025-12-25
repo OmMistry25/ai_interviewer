@@ -5,6 +5,7 @@ import {
   getNextQuestion,
   updateCurrentQuestion,
   completeInterview,
+  loadResumeContext,
 } from "@/lib/interview/orchestrator";
 import {
   evaluateAnswer,
@@ -47,11 +48,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Evaluate the answer
+    // Load resume context for personalized evaluation
+    const resumeContext = await loadResumeContext(interviewId);
+
+    // Evaluate the answer with resume context
     const evaluation = await evaluateAnswer(
       currentQuestion,
       candidateAnswer,
-      state.config
+      state.config,
+      resumeContext
     );
 
     // Store the evaluation score for this question

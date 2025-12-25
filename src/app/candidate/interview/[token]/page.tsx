@@ -14,7 +14,7 @@ export default async function CandidateInterviewPage({
 
   if (!session) {
     return (
-      <div className="min-h-screen bg-zinc-900 flex items-center justify-center">
+      <div className="h-screen w-screen bg-zinc-950 flex items-center justify-center">
         <div className="text-center text-white">
           <h1 className="text-2xl font-bold mb-2">Invalid Interview Link</h1>
           <p className="text-zinc-400">
@@ -27,7 +27,7 @@ export default async function CandidateInterviewPage({
 
   if (session.status === "completed") {
     return (
-      <div className="min-h-screen bg-zinc-900 flex items-center justify-center">
+      <div className="h-screen w-screen bg-zinc-950 flex items-center justify-center">
         <div className="text-center text-white">
           <h1 className="text-2xl font-bold mb-2">Interview Completed</h1>
           <p className="text-zinc-400">
@@ -39,14 +39,10 @@ export default async function CandidateInterviewPage({
   }
 
   return (
-    <div className="min-h-screen bg-zinc-900 p-8">
-      <div className="max-w-4xl mx-auto">
-        <InterviewRoom 
-          interviewToken={token} 
-          candidateName={session.candidateName} 
-        />
-      </div>
-    </div>
+    <InterviewRoom 
+      interviewToken={token} 
+      candidateName={session.candidateName} 
+    />
   );
 }
 

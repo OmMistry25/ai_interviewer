@@ -19,21 +19,35 @@ export default async function Home() {
             <p className="text-zinc-400">Logged in as {session.user.email}</p>
             
             {org ? (
-              <div className="p-4 bg-zinc-800 rounded space-y-2">
-                <p className="text-green-400">Organization: {org.name}</p>
-                <p className="text-zinc-500 text-sm">Role: {org.role}</p>
-                <div className="flex gap-2">
+              <div className="p-6 bg-zinc-800 rounded-xl space-y-4 max-w-md mx-auto">
+                <div className="text-left">
+                  <p className="text-emerald-400 font-medium">{org.name}</p>
+                  <p className="text-zinc-500 text-sm">Role: {org.role}</p>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <Link
+                    href="/admin/jobs"
+                    className="px-4 py-3 rounded-lg bg-emerald-600 text-white hover:bg-emerald-500 text-sm font-medium transition-colors"
+                  >
+                    📋 Jobs
+                  </Link>
+                  <Link
+                    href="/admin/candidates"
+                    className="px-4 py-3 rounded-lg bg-purple-600 text-white hover:bg-purple-500 text-sm font-medium transition-colors"
+                  >
+                    👥 Candidates
+                  </Link>
                   <Link
                     href="/admin/templates"
-                    className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 text-sm"
+                    className="px-4 py-3 rounded-lg bg-blue-600 text-white hover:bg-blue-500 text-sm font-medium transition-colors"
                   >
-                    Templates
+                    📝 Templates
                   </Link>
                   <Link
                     href="/admin/interviews"
-                    className="px-4 py-2 rounded bg-green-600 text-white hover:bg-green-700 text-sm"
+                    className="px-4 py-3 rounded-lg bg-zinc-700 text-white hover:bg-zinc-600 text-sm font-medium transition-colors"
                   >
-                    Interviews
+                    🎥 Interviews
                   </Link>
                 </div>
               </div>

@@ -50,6 +50,20 @@ export async function POST(request: NextRequest) {
       .update({ decision })
       .eq("interview_id", interviewId);
 
+    // Update linked application status to "interviewed"
+    const { data: interview } = await adminClient
+      .from("interviews")
+      .select("application_id")
+      .eq("id", interviewId)
+      .single();
+
+    if (interview?.application_id) {
+      await adminClient
+        .from("applications")
+        .update({ status: "interviewed" })
+        .eq("id", interview.application_id);
+    }
+
     return NextResponse.json({
       scores: evaluation.scores,
       decision,

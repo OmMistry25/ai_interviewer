@@ -45,13 +45,26 @@ const SIGNAL_CRITERIA: Record<string, string> = {
     - Specificity: Did they provide concrete examples?`,
 };
 
+// Resume analysis type for context
+export interface ResumeContext {
+  summary?: string;
+  skills?: string[];
+  relevant_experience?: string[];
+  interview_focus_areas?: string[];
+  suggested_questions?: string[];
+  fit_score?: number;
+  strengths?: string[];
+  concerns?: string[];
+}
+
 /**
  * Build evaluator prompt (Task 10.1)
  */
 export function buildEvaluatorPrompt(
   question: Question,
   candidateAnswer: string,
-  config: TemplateConfig
+  config: TemplateConfig,
+  resumeContext?: ResumeContext
 ): string {
   const signal = question.rubric?.signal || "general";
   const criteria = SIGNAL_CRITERIA[signal] || SIGNAL_CRITERIA.general;
@@ -77,10 +90,28 @@ Use this context to judge if the candidate's experience and answers are RELEVANT
 `;
   }
 
+  // Build resume context section
+  let resumeSection = "";
+  if (resumeContext) {
+    resumeSection = `
+## Candidate Background (from resume)
+${resumeContext.summary ? `- **Summary:** ${resumeContext.summary}` : ""}
+${resumeContext.skills?.length ? `- **Skills:** ${resumeContext.skills.join(", ")}` : ""}
+${resumeContext.relevant_experience?.length ? `- **Relevant Experience:** ${resumeContext.relevant_experience.join("; ")}` : ""}
+${resumeContext.strengths?.length ? `- **Strengths:** ${resumeContext.strengths.join(", ")}` : ""}
+${resumeContext.concerns?.length ? `- **Concerns to Address:** ${resumeContext.concerns.join(", ")}` : ""}
+
+Use this background to:
+1. Verify if their verbal answers align with their resume claims
+2. Give higher scores when they expand on resume experience with specific details
+3. Note any discrepancies between resume and verbal answers
+`;
+  }
+
   return `${config.system_prompt}
 
 You are evaluating a candidate's answer in an interview.
-${roleSection}
+${roleSection}${resumeSection}
 ## Question
 "${question.prompt}"
 
@@ -121,9 +152,10 @@ JSON response only:`;
 export async function evaluateAnswer(
   question: Question,
   candidateAnswer: string,
-  config: TemplateConfig
+  config: TemplateConfig,
+  resumeContext?: ResumeContext
 ): Promise<EvaluatorOutput> {
-  const prompt = buildEvaluatorPrompt(question, candidateAnswer, config);
+  const prompt = buildEvaluatorPrompt(question, candidateAnswer, config, resumeContext);
 
   const response = await openai.chat.completions.create({
     model: "gpt-4o-mini",
