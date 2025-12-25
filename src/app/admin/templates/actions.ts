@@ -7,6 +7,8 @@ import { revalidatePath } from "next/cache";
 export async function createTemplate(name: string) {
   const org = await getCurrentOrg();
   
+  console.log("[createTemplate] org:", org);
+  
   if (!org) {
     return { error: "Not authenticated" };
   }
@@ -14,18 +16,22 @@ export async function createTemplate(name: string) {
   // Use admin client to bypass RLS for creating templates
   const supabase = createSupabaseAdminClient();
 
+  console.log("[createTemplate] Creating template with org_id:", org.orgId);
+
   const { data: template, error: templateError } = await supabase
     .from("interview_templates")
     .insert({ org_id: org.orgId, name })
     .select()
     .single();
 
+  console.log("[createTemplate] Template result:", { template, templateError });
+
   if (templateError) {
     return { error: templateError.message };
   }
 
   // Create initial draft version (published_at = null means draft)
-  const { error: versionError } = await supabase
+  const { data: version, error: versionError } = await supabase
     .from("interview_template_versions")
     .insert({
       template_id: template.id,
@@ -36,13 +42,18 @@ export async function createTemplate(name: string) {
         questions: [],
         policies: { max_followups_per_question: 1, min_answer_seconds: 5 },
       },
-    });
+    })
+    .select()
+    .single();
+
+  console.log("[createTemplate] Version result:", { version, versionError });
 
   if (versionError) {
     return { error: versionError.message };
   }
 
   revalidatePath("/admin/templates");
+  console.log("[createTemplate] Success! Returning templateId:", template.id);
   return { templateId: template.id };
 }
 

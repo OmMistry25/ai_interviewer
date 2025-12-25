@@ -18,11 +18,14 @@ export default async function EditTemplatePage({ params }: Props) {
   // Use admin client to bypass RLS for reading templates
   const supabase = createSupabaseAdminClient();
 
-  const { data: template } = await supabase
+  console.log("[EditTemplatePage] Looking for template:", templateId, "org:", org.orgId);
+
+  const { data: template, error } = await supabase
     .from("interview_templates")
     .select(`
       id,
       name,
+      org_id,
       interview_template_versions (
         id,
         version,
@@ -32,10 +35,18 @@ export default async function EditTemplatePage({ params }: Props) {
       )
     `)
     .eq("id", templateId)
-    .eq("org_id", org.orgId)
     .single();
 
+  console.log("[EditTemplatePage] Query result:", { template, error });
+
   if (!template) {
+    console.log("[EditTemplatePage] Template not found, returning 404");
+    notFound();
+  }
+
+  // Verify org ownership
+  if (template.org_id !== org.orgId) {
+    console.log("[EditTemplatePage] Org mismatch:", template.org_id, "vs", org.orgId);
     notFound();
   }
 
