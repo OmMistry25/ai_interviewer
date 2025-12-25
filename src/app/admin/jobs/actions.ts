@@ -39,7 +39,7 @@ export async function createJob(formData: FormData) {
       .from("interview_template_versions")
       .select("id")
       .eq("template_id", parsed.data.template_id)
-      .eq("status", "published")
+      .not("published_at", "is", null)
       .single();
     templateVersionId = version?.id;
   }
@@ -99,7 +99,7 @@ export async function updateJob(jobId: string, formData: FormData) {
       .from("interview_template_versions")
       .select("id")
       .eq("template_id", parsed.data.template_id)
-      .eq("status", "published")
+      .not("published_at", "is", null)
       .single();
     templateVersionId = version?.id;
   }

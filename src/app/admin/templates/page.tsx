@@ -19,7 +19,7 @@ export default async function TemplatesPage() {
       interview_template_versions (
         id,
         version,
-        status,
+        published_at,
         created_at
       )
     `)
@@ -44,10 +44,10 @@ export default async function TemplatesPage() {
             const versions = template.interview_template_versions as Array<{
               id: string;
               version: number;
-              status: string;
+              published_at: string | null;
               created_at: string;
             }>;
-            const publishedVersion = versions?.find((v) => v.status === "published");
+            const publishedVersion = versions?.find((v) => v.published_at !== null);
             const latestVersion = versions?.[0];
 
             return (

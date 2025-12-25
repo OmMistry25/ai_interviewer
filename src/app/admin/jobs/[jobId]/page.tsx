@@ -47,11 +47,11 @@ export default async function EditJobPage({ params }: Props) {
       id,
       name,
       interview_template_versions!inner (
-        status
+        published_at
       )
     `)
     .eq("org_id", org.orgId)
-    .eq("interview_template_versions.status", "published");
+    .not("interview_template_versions.published_at", "is", null);
 
   const templateVersion = job.interview_template_versions as unknown as { template_id: string } | null;
 

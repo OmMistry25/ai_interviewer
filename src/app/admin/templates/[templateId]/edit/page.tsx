@@ -25,7 +25,7 @@ export default async function EditTemplatePage({ params }: Props) {
         id,
         version,
         config,
-        status,
+        published_at,
         created_at
       )
     `)
@@ -41,25 +41,26 @@ export default async function EditTemplatePage({ params }: Props) {
     id: string;
     version: number;
     config: Record<string, unknown>;
-    status: string;
+    published_at: string | null;
     created_at: string;
   }>;
 
   // Get the latest version (draft or published)
   const latestVersion = versions?.sort((a, b) => b.version - a.version)[0];
+  const isPublished = latestVersion?.published_at !== null;
 
   return (
     <div className="min-h-screen bg-zinc-900 text-white p-8">
       <div className="max-w-4xl mx-auto">
         <h1 className="text-3xl font-bold mb-2">{template.name}</h1>
         <p className="text-zinc-400 mb-8">
-          Version {latestVersion?.version || 1} ({latestVersion?.status || "draft"})
+          Version {latestVersion?.version || 1} ({isPublished ? "published" : "draft"})
         </p>
 
         <TemplateEditor
           versionId={latestVersion?.id || ""}
           initialConfig={latestVersion?.config || {}}
-          status={latestVersion?.status || "draft"}
+          status={isPublished ? "published" : "draft"}
         />
       </div>
     </div>

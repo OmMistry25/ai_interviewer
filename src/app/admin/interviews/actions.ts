@@ -26,7 +26,7 @@ export async function createInterview(formData: FormData) {
     .from("interview_template_versions")
     .select("id")
     .eq("template_id", templateId)
-    .eq("status", "published")
+    .not("published_at", "is", null)
     .single();
 
   if (!version) {

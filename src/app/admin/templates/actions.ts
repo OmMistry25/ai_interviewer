@@ -22,7 +22,7 @@ export async function createTemplate(name: string) {
     return { error: templateError.message };
   }
 
-  // Create initial draft version
+  // Create initial draft version (published_at = null means draft)
   const { error: versionError } = await supabase
     .from("interview_template_versions")
     .insert({
@@ -34,7 +34,6 @@ export async function createTemplate(name: string) {
         questions: [],
         policies: { max_followups_per_question: 1, min_answer_seconds: 5 },
       },
-      status: "draft",
     });
 
   if (versionError) {
@@ -88,17 +87,17 @@ export async function publishTemplateVersion(versionId: string) {
     return { error: "Version not found" };
   }
 
-  // Unpublish any existing published versions
+  // Unpublish any existing published versions (set published_at to null)
   await supabase
     .from("interview_template_versions")
-    .update({ status: "archived" })
+    .update({ published_at: null })
     .eq("template_id", version.template_id)
-    .eq("status", "published");
+    .not("published_at", "is", null);
 
-  // Publish this version
+  // Publish this version (set published_at to now)
   const { error } = await supabase
     .from("interview_template_versions")
-    .update({ status: "published" })
+    .update({ published_at: new Date().toISOString() })
     .eq("id", versionId);
 
   if (error) {

@@ -18,11 +18,11 @@ export default async function NewJobPage() {
       id,
       name,
       interview_template_versions!inner (
-        status
+        published_at
       )
     `)
     .eq("org_id", org.orgId)
-    .eq("interview_template_versions.status", "published");
+    .not("interview_template_versions.published_at", "is", null);
 
   return (
     <div className="min-h-screen bg-zinc-900 text-white p-8">

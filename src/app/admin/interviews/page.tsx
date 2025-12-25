@@ -20,11 +20,11 @@ export default async function InterviewsPage() {
       name,
       interview_template_versions!inner (
         id,
-        status
+        published_at
       )
     `)
     .eq("org_id", org.orgId)
-    .eq("interview_template_versions.status", "published");
+    .not("interview_template_versions.published_at", "is", null);
 
   // Get recent interviews
   const { data: interviews } = await supabase
