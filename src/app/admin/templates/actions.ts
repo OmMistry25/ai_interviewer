@@ -1,16 +1,18 @@
 "use server";
 
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getCurrentOrg } from "@/lib/supabase/helpers";
 import { revalidatePath } from "next/cache";
 
 export async function createTemplate(name: string) {
-  const supabase = await createSupabaseServerClient();
   const org = await getCurrentOrg();
   
   if (!org) {
     return { error: "Not authenticated" };
   }
+
+  // Use admin client to bypass RLS for creating templates
+  const supabase = createSupabaseAdminClient();
 
   const { data: template, error: templateError } = await supabase
     .from("interview_templates")
@@ -48,12 +50,13 @@ export async function updateTemplateVersion(
   versionId: string,
   config: Record<string, unknown>
 ) {
-  const supabase = await createSupabaseServerClient();
   const org = await getCurrentOrg();
   
   if (!org) {
     return { error: "Not authenticated" };
   }
+
+  const supabase = createSupabaseAdminClient();
 
   const { error } = await supabase
     .from("interview_template_versions")
@@ -69,12 +72,13 @@ export async function updateTemplateVersion(
 }
 
 export async function publishTemplateVersion(versionId: string) {
-  const supabase = await createSupabaseServerClient();
   const org = await getCurrentOrg();
   
   if (!org) {
     return { error: "Not authenticated" };
   }
+
+  const supabase = createSupabaseAdminClient();
 
   // Get the template_id for this version
   const { data: version } = await supabase

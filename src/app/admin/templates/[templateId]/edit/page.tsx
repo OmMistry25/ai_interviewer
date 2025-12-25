@@ -1,4 +1,4 @@
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getCurrentOrg } from "@/lib/supabase/helpers";
 import { redirect, notFound } from "next/navigation";
 import { TemplateEditor } from "./TemplateEditor";
@@ -9,12 +9,14 @@ interface Props {
 
 export default async function EditTemplatePage({ params }: Props) {
   const { templateId } = await params;
-  const supabase = await createSupabaseServerClient();
   const org = await getCurrentOrg();
   
   if (!org) {
     redirect("/login");
   }
+
+  // Use admin client to bypass RLS for reading templates
+  const supabase = createSupabaseAdminClient();
 
   const { data: template } = await supabase
     .from("interview_templates")
