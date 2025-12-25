@@ -3,73 +3,119 @@
 import { useState } from "react";
 import { createInterview } from "./actions";
 
-interface Template {
-  id: string;
-  name: string;
+interface Props {
+  templates: { id: string; name: string }[];
 }
 
-export function CreateInterviewForm({ templates }: { templates: Template[] }) {
-  const [result, setResult] = useState<{ accessToken?: string; error?: string } | null>(null);
+export function CreateInterviewForm({ templates }: Props) {
+  const [result, setResult] = useState<{
+    success?: boolean;
+    token?: string;
+    error?: string;
+  } | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (formData: FormData) => {
+  async function handleSubmit(formData: FormData) {
+    setLoading(true);
+    setResult(null);
+
     const res = await createInterview(formData);
     setResult(res);
-  };
+    setLoading(false);
+  }
+
+  const interviewUrl = result?.token
+    ? `${window.location.origin}/candidate/interview/${result.token}`
+    : null;
 
   return (
-    <div className="mb-8 p-4 bg-zinc-800 rounded">
-      <h2 className="text-lg font-semibold text-white mb-4">Create Interview</h2>
-      
-      <form action={handleSubmit} className="space-y-4">
-        <div className="grid grid-cols-2 gap-4">
-          <input
-            name="candidateName"
-            type="text"
-            placeholder="Candidate Name"
-            required
-            className="p-3 rounded bg-zinc-700 text-white border border-zinc-600"
-          />
-          <input
-            name="candidateEmail"
-            type="email"
-            placeholder="Candidate Email (optional)"
-            className="p-3 rounded bg-zinc-700 text-white border border-zinc-600"
-          />
-        </div>
-        <select
-          name="templateId"
-          required
-          className="w-full p-3 rounded bg-zinc-700 text-white border border-zinc-600"
-        >
-          <option value="">Select Template</option>
-          {templates.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.name}
-            </option>
-          ))}
-        </select>
-        <button
-          type="submit"
-          className="px-6 py-3 rounded bg-blue-600 text-white font-medium hover:bg-blue-700"
-        >
-          Create Interview
-        </button>
-      </form>
-
-      {result?.accessToken && (
-        <div className="mt-4 p-4 bg-green-900/30 rounded border border-green-700">
-          <p className="text-green-400 font-medium mb-2">Interview Created!</p>
-          <p className="text-zinc-300 text-sm mb-1">Share this link with the candidate:</p>
-          <code className="block p-2 bg-zinc-900 rounded text-sm text-zinc-200 break-all">
-            {typeof window !== "undefined" ? window.location.origin : ""}/candidate/interview/{result.accessToken}
-          </code>
-        </div>
-      )}
-
+    <form action={handleSubmit} className="space-y-4">
       {result?.error && (
-        <p className="mt-4 text-red-400">{result.error}</p>
+        <div className="p-3 bg-red-900/50 border border-red-700 rounded-lg text-red-300 text-sm">
+          {result.error}
+        </div>
       )}
-    </div>
+
+      {interviewUrl && (
+        <div className="p-4 bg-emerald-900/50 border border-emerald-700 rounded-lg">
+          <p className="text-emerald-300 text-sm mb-2">Interview created! Send this link to the candidate:</p>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={interviewUrl}
+              readOnly
+              className="flex-1 px-3 py-2 bg-zinc-900 border border-zinc-600 rounded text-sm font-mono"
+            />
+            <button
+              type="button"
+              onClick={() => navigator.clipboard.writeText(interviewUrl)}
+              className="px-3 py-2 bg-zinc-700 rounded hover:bg-zinc-600 text-sm"
+            >
+              Copy
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-zinc-300 mb-1">
+            Template
+          </label>
+          <select
+            name="templateId"
+            required
+            className="w-full px-3 py-2 bg-zinc-700 border border-zinc-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          >
+            <option value="">Select template...</option>
+            {templates.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-zinc-300 mb-1">
+            Candidate Name
+          </label>
+          <input
+            type="text"
+            name="candidateName"
+            required
+            className="w-full px-3 py-2 bg-zinc-700 border border-zinc-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            placeholder="John Doe"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-zinc-300 mb-1">
+            Candidate Email
+          </label>
+          <input
+            type="email"
+            name="candidateEmail"
+            required
+            className="w-full px-3 py-2 bg-zinc-700 border border-zinc-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            placeholder="john@example.com"
+          />
+        </div>
+      </div>
+
+      <button
+        type="submit"
+        disabled={loading || templates.length === 0}
+        className="px-6 py-2 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-500 transition-colors disabled:opacity-50"
+      >
+        {loading ? "Creating..." : "Create Interview"}
+      </button>
+
+      {templates.length === 0 && (
+        <p className="text-yellow-400 text-sm">
+          No published templates available. Create and publish a template first.
+        </p>
+      )}
+    </form>
   );
 }
-

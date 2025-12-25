@@ -233,6 +233,15 @@ export function JobForm({ templates, job }: JobFormProps) {
         )}
       </div>
 
+      {isEditing && job.status === "active" && (
+        <div className="p-4 bg-zinc-800 rounded-lg border border-zinc-700">
+          <p className="text-sm text-zinc-400 mb-2">Public Application Page:</p>
+          <code className="text-emerald-400 text-sm">
+            {typeof window !== "undefined" ? window.location.origin : ""}/apply/{job.id}
+          </code>
+        </div>
+      )}
+
       <div className="pt-4 border-t border-zinc-700">
         <Link href="/admin/jobs" className="text-zinc-400 hover:text-white text-sm">
           ← Back to Jobs
@@ -241,4 +250,3 @@ export function JobForm({ templates, job }: JobFormProps) {
     </form>
   );
 }
-

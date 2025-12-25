@@ -1,160 +1,149 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getCurrentOrg } from "@/lib/supabase/helpers";
-import { redirect } from "next/navigation";
 import Link from "next/link";
+import { redirect, notFound } from "next/navigation";
 
-type Params = Promise<{ interviewId: string }>;
+interface Props {
+  params: Promise<{ interviewId: string }>;
+}
 
-export default async function InterviewDetailPage({
-  params,
-}: {
-  params: Params;
-}) {
+export default async function InterviewDetailPage({ params }: Props) {
   const { interviewId } = await params;
-  
+  const supabase = await createSupabaseServerClient();
   const org = await getCurrentOrg();
+  
   if (!org) {
-    redirect("/");
+    redirect("/login");
   }
 
-  const supabase = await createSupabaseServerClient();
-
-  // Get interview
   const { data: interview } = await supabase
     .from("interviews")
-    .select("id, candidate_name, status, created_at, started_at, completed_at")
+    .select(`
+      *,
+      template_versions (
+        config,
+        interview_templates (
+          name
+        )
+      )
+    `)
     .eq("id", interviewId)
     .eq("org_id", org.orgId)
     .single();
 
   if (!interview) {
-    redirect("/admin/interviews");
+    notFound();
   }
 
-  // Get turns (Task 13.2)
-  const { data: turns } = await supabase
-    .from("interview_turns")
-    .select("id, speaker, transcript, question_id, created_at")
-    .eq("interview_id", interviewId)
-    .order("created_at", { ascending: true });
+  const templateVersions = interview.template_versions as unknown as {
+    config: Record<string, unknown>;
+    interview_templates: { name: string } | null;
+  } | null;
 
-  // Get evaluation (Task 13.3)
-  const { data: evaluation } = await supabase
-    .from("evaluations")
-    .select("scores, decision")
-    .eq("interview_id", interviewId)
-    .single();
+  const interviewUrl = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/candidate/interview/${interview.token}`;
 
   return (
-    <div className="min-h-screen bg-zinc-900 p-8">
+    <div className="min-h-screen bg-zinc-900 text-white p-8">
       <div className="max-w-4xl mx-auto">
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-2xl font-bold text-white">
-              {interview.candidate_name}
-            </h1>
-            <p className="text-zinc-500 text-sm">
-              Status:{" "}
-              <span
-                className={
-                  interview.status === "completed"
-                    ? "text-green-400"
-                    : interview.status === "live"
-                    ? "text-blue-400"
-                    : "text-yellow-400"
-                }
-              >
-                {interview.status}
-              </span>
-            </p>
-          </div>
-          <Link
-            href="/admin/interviews"
-            className="text-zinc-400 hover:text-white"
-          >
-            ← Back to interviews
+        <div className="mb-8">
+          <Link href="/admin/interviews" className="text-zinc-400 hover:text-white text-sm">
+            ← Back to Interviews
           </Link>
         </div>
 
-        {/* Score Breakdown (Task 13.3) */}
-        {evaluation && (
-          <div className="mb-8 p-6 bg-zinc-800 rounded">
-            <h2 className="text-lg font-semibold text-white mb-4">
-              Evaluation
-            </h2>
-            <div className="grid grid-cols-2 gap-4 mb-4">
-              <div>
-                <p className="text-zinc-500 text-sm">Total Score</p>
-                <p className="text-2xl font-bold text-white">
-                  {(((evaluation.scores as { totalScore?: number })?.totalScore ?? 0) * 100).toFixed(0)}%
-                </p>
-              </div>
-              <div>
-                <p className="text-zinc-500 text-sm">Decision</p>
-                <p
-                  className={`text-2xl font-bold ${
-                    evaluation.decision === "advance"
-                      ? "text-green-400"
-                      : evaluation.decision === "hold"
-                      ? "text-yellow-400"
-                      : "text-red-400"
-                  }`}
-                >
-                  {evaluation.decision || "Pending"}
-                </p>
-              </div>
-            </div>
+        <div className="flex justify-between items-start mb-8">
+          <div>
+            <h1 className="text-3xl font-bold">{interview.candidate_name}</h1>
+            <p className="text-zinc-400">{interview.candidate_email}</p>
+          </div>
+          <span
+            className={`px-3 py-1 rounded-full text-sm font-medium ${
+              interview.status === "completed"
+                ? "bg-emerald-900 text-emerald-300"
+                : interview.status === "in_progress"
+                ? "bg-yellow-900 text-yellow-300"
+                : "bg-zinc-700 text-zinc-300"
+            }`}
+          >
+            {interview.status}
+          </span>
+        </div>
 
-            {/* Signal breakdown */}
-            {(evaluation.scores as { signals?: Record<string, { score: number; weight: number }> })?.signals && (
-              <div className="space-y-2">
-                <p className="text-zinc-400 text-sm">Signal Breakdown:</p>
-                {Object.entries(
-                  (evaluation.scores as { signals: Record<string, { score: number; weight: number }> }).signals
-                ).map(([signal, data]) => (
-                  <div
-                    key={signal}
-                    className="flex justify-between text-sm"
-                  >
-                    <span className="text-zinc-300">{signal}</span>
-                    <span className="text-white">
-                      {(data.score * 100).toFixed(0)}% (weight: {data.weight})
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
+        {/* Interview Link */}
+        {interview.status === "pending" && (
+          <div className="bg-zinc-800 rounded-lg p-6 border border-zinc-700 mb-6">
+            <h2 className="text-lg font-semibold mb-2">Interview Link</h2>
+            <p className="text-zinc-400 text-sm mb-3">Share this link with the candidate:</p>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={interviewUrl}
+                readOnly
+                className="flex-1 px-3 py-2 bg-zinc-900 border border-zinc-600 rounded text-sm font-mono"
+              />
+              <button
+                onClick={() => navigator.clipboard.writeText(interviewUrl)}
+                className="px-3 py-2 bg-zinc-700 rounded hover:bg-zinc-600 text-sm"
+              >
+                Copy
+              </button>
+            </div>
           </div>
         )}
 
-        {/* Transcript (Task 13.2) */}
-        <div className="p-6 bg-zinc-800 rounded">
-          <h2 className="text-lg font-semibold text-white mb-4">Transcript</h2>
-          {turns && turns.length > 0 ? (
+        {/* Transcript */}
+        {interview.transcript && (
+          <div className="bg-zinc-800 rounded-lg p-6 border border-zinc-700 mb-6">
+            <h2 className="text-lg font-semibold mb-4">Transcript</h2>
             <div className="space-y-4">
-              {turns.map((turn) => (
-                <div
-                  key={turn.id}
-                  className={`p-4 rounded ${
-                    turn.speaker === "ai"
-                      ? "bg-blue-900/30 border-l-4 border-blue-500"
-                      : "bg-zinc-700/50 border-l-4 border-green-500"
-                  }`}
-                >
-                  <p className="text-xs text-zinc-500 mb-1">
-                    {turn.speaker === "ai" ? "AI Interviewer" : "Candidate"}
-                    {turn.question_id && ` • Q: ${turn.question_id}`}
-                  </p>
-                  <p className="text-white">{turn.transcript}</p>
-                </div>
-              ))}
+              {(interview.transcript as Array<{ role: string; content: string }>).map(
+                (msg, i) => (
+                  <div
+                    key={i}
+                    className={`p-3 rounded-lg ${
+                      msg.role === "assistant"
+                        ? "bg-zinc-700"
+                        : "bg-emerald-900/30"
+                    }`}
+                  >
+                    <p className="text-xs text-zinc-400 mb-1">
+                      {msg.role === "assistant" ? "Interviewer" : "Candidate"}
+                    </p>
+                    <p>{msg.content}</p>
+                  </div>
+                )
+              )}
             </div>
-          ) : (
-            <p className="text-zinc-500">No transcript available yet.</p>
-          )}
-        </div>
+          </div>
+        )}
+
+        {/* Scores */}
+        {interview.scores && (
+          <div className="bg-zinc-800 rounded-lg p-6 border border-zinc-700 mb-6">
+            <h2 className="text-lg font-semibold mb-4">Evaluation Scores</h2>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {Object.entries(interview.scores as Record<string, number>).map(
+                ([signal, score]) => (
+                  <div key={signal} className="text-center p-4 bg-zinc-700 rounded-lg">
+                    <p className="text-2xl font-bold text-emerald-400">
+                      {Math.round(score * 100)}%
+                    </p>
+                    <p className="text-sm text-zinc-400 capitalize">{signal}</p>
+                  </div>
+                )
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Summary */}
+        {interview.summary && (
+          <div className="bg-zinc-800 rounded-lg p-6 border border-zinc-700">
+            <h2 className="text-lg font-semibold mb-4">AI Summary</h2>
+            <p className="text-zinc-300 whitespace-pre-wrap">{interview.summary}</p>
+          </div>
+        )}
       </div>
     </div>
   );
 }
-

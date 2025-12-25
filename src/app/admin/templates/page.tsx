@@ -1,86 +1,96 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getCurrentOrg } from "@/lib/supabase/helpers";
-import { createTemplate } from "./actions";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
 export default async function TemplatesPage() {
+  const supabase = await createSupabaseServerClient();
   const org = await getCurrentOrg();
+  
   if (!org) {
-    redirect("/");
+    redirect("/login");
   }
 
-  const supabase = await createSupabaseServerClient();
   const { data: templates } = await supabase
     .from("interview_templates")
-    .select("id, name, status, created_at")
+    .select(`
+      id,
+      name,
+      template_versions (
+        id,
+        version,
+        status,
+        created_at
+      )
+    `)
     .eq("org_id", org.orgId)
     .order("created_at", { ascending: false });
 
   return (
-    <div className="min-h-screen bg-zinc-900 p-8">
-      <div className="max-w-4xl mx-auto">
+    <div className="min-h-screen bg-zinc-900 text-white p-8">
+      <div className="max-w-6xl mx-auto">
         <div className="flex justify-between items-center mb-8">
-          <h1 className="text-2xl font-bold text-white">Interview Templates</h1>
-          <Link href="/" className="text-zinc-400 hover:text-white">
-            ← Back
+          <h1 className="text-3xl font-bold">Interview Templates</h1>
+          <Link
+            href="/admin/templates/new"
+            className="px-4 py-2 bg-emerald-600 rounded-lg hover:bg-emerald-500 transition-colors"
+          >
+            + Create Template
           </Link>
         </div>
 
-        {/* Create Template Form */}
-        <form action={createTemplate} className="mb-8 flex gap-2">
-          <input
-            name="name"
-            type="text"
-            placeholder="New template name"
-            required
-            className="flex-1 p-3 rounded bg-zinc-800 text-white border border-zinc-700"
-          />
-          <button
-            type="submit"
-            className="px-6 py-3 rounded bg-blue-600 text-white font-medium hover:bg-blue-700"
-          >
-            Create Template
-          </button>
-        </form>
+        <div className="grid gap-4">
+          {templates?.map((template) => {
+            const versions = template.template_versions as Array<{
+              id: string;
+              version: number;
+              status: string;
+              created_at: string;
+            }>;
+            const publishedVersion = versions?.find((v) => v.status === "published");
+            const latestVersion = versions?.[0];
 
-        {/* Template List */}
-        {templates && templates.length > 0 ? (
-          <div className="space-y-2">
-            {templates.map((template) => (
+            return (
               <div
                 key={template.id}
-                className="flex items-center justify-between p-4 bg-zinc-800 rounded"
+                className="bg-zinc-800 rounded-lg p-6 border border-zinc-700"
               >
-                <div>
-                  <p className="text-white font-medium">{template.name}</p>
-                  <p className="text-zinc-500 text-sm">
-                    Status:{" "}
-                    <span
-                      className={
-                        template.status === "published"
-                          ? "text-green-400"
-                          : "text-yellow-400"
-                      }
-                    >
-                      {template.status}
-                    </span>
-                  </p>
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h2 className="text-xl font-semibold">{template.name}</h2>
+                    <p className="text-zinc-400 text-sm mt-1">
+                      {versions?.length || 0} version(s)
+                      {publishedVersion && (
+                        <span className="ml-2 text-emerald-400">
+                          • v{publishedVersion.version} published
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                  <Link
+                    href={`/admin/templates/${template.id}/edit`}
+                    className="px-4 py-2 bg-zinc-700 rounded-lg hover:bg-zinc-600 transition-colors"
+                  >
+                    Edit
+                  </Link>
                 </div>
-                <Link
-                  href={`/admin/templates/${template.id}/edit`}
-                  className="px-4 py-2 rounded bg-zinc-700 text-white hover:bg-zinc-600"
-                >
-                  Edit
-                </Link>
               </div>
-            ))}
-          </div>
-        ) : (
-          <p className="text-zinc-500">No templates yet. Create one above.</p>
-        )}
+            );
+          })}
+
+          {(!templates || templates.length === 0) && (
+            <div className="text-center py-12 text-zinc-500">
+              <p>No templates yet. Create your first one!</p>
+            </div>
+          )}
+        </div>
+
+        <div className="mt-8">
+          <Link href="/" className="text-zinc-400 hover:text-white">
+            ← Back to Home
+          </Link>
+        </div>
       </div>
     </div>
   );
 }
-

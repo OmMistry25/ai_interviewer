@@ -1,57 +1,79 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getCurrentOrg } from "@/lib/supabase/helpers";
 import { redirect, notFound } from "next/navigation";
-import { getJob } from "../actions";
 import { JobForm } from "../JobForm";
-import Link from "next/link";
 
-type Params = Promise<{ jobId: string }>;
+interface Props {
+  params: Promise<{ jobId: string }>;
+}
 
-export default async function EditJobPage({ params }: { params: Params }) {
+export default async function EditJobPage({ params }: Props) {
   const { jobId } = await params;
-  
   const supabase = await createSupabaseServerClient();
-  const { data: { user } } = await supabase.auth.getUser();
-
-  if (!user) {
+  const org = await getCurrentOrg();
+  
+  if (!org) {
     redirect("/login");
   }
 
-  const org = await getCurrentOrg();
-  if (!org) {
-    redirect("/");
-  }
+  const { data: job } = await supabase
+    .from("job_postings")
+    .select(`
+      id,
+      title,
+      description,
+      location,
+      employment_type,
+      hourly_rate_min,
+      hourly_rate_max,
+      status,
+      template_version_id,
+      template_versions (
+        template_id
+      )
+    `)
+    .eq("id", jobId)
+    .eq("org_id", org.orgId)
+    .single();
 
-  const { data: job, error } = await getJob(jobId);
-  if (error || !job) {
+  if (!job) {
     notFound();
   }
 
-  // Get templates for dropdown
+  // Get published templates
   const { data: templates } = await supabase
     .from("interview_templates")
-    .select("id, name")
+    .select(`
+      id,
+      name,
+      template_versions!inner (
+        status
+      )
+    `)
     .eq("org_id", org.orgId)
-    .eq("status", "published");
+    .eq("template_versions.status", "published");
+
+  const templateVersion = job.template_versions as unknown as { template_id: string } | null;
 
   return (
     <div className="min-h-screen bg-zinc-900 text-white p-8">
       <div className="max-w-2xl mx-auto">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold">Edit Job</h1>
-          {job.status === "active" && (
-            <Link
-              href={`/apply/${job.id}`}
-              target="_blank"
-              className="px-4 py-2 bg-zinc-700 text-zinc-300 rounded-lg hover:bg-zinc-600 transition-colors text-sm"
-            >
-              View Public Apply Page →
-            </Link>
-          )}
-        </div>
-        <JobForm templates={templates || []} job={job} />
+        <h1 className="text-3xl font-bold mb-8">Edit Job</h1>
+        <JobForm
+          templates={templates?.map((t) => ({ id: t.id, name: t.name })) || []}
+          job={{
+            id: job.id,
+            title: job.title,
+            description: job.description || undefined,
+            location: job.location || undefined,
+            employment_type: job.employment_type,
+            hourly_rate_min: job.hourly_rate_min || undefined,
+            hourly_rate_max: job.hourly_rate_max || undefined,
+            template_id: templateVersion?.template_id,
+            status: job.status,
+          }}
+        />
       </div>
     </div>
   );
 }
-

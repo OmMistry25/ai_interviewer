@@ -1,175 +1,111 @@
 "use server";
 
-import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { validateTemplateConfig } from "@/lib/interview/validator";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getCurrentOrg } from "@/lib/supabase/helpers";
 import { revalidatePath } from "next/cache";
 
-const DEFAULT_CONFIG = {
-  system_prompt: "You are a professional interviewer.",
-  voice: { voice_id: "neutral", speed: 1.0 },
-  questions: [
-    {
-      id: "intro",
-      prompt: "Please introduce yourself.",
-      followups: [],
-    },
-  ],
-  policies: {
-    max_followups_per_question: 1,
-    min_answer_seconds: 6,
-  },
-};
-
-export async function createTemplate(formData: FormData): Promise<void> {
-  const name = formData.get("name") as string;
-  if (!name?.trim()) {
-    throw new Error("Template name is required");
-  }
-
+export async function createTemplate(name: string) {
+  const supabase = await createSupabaseServerClient();
   const org = await getCurrentOrg();
+  
   if (!org) {
-    throw new Error("No organization found");
+    return { error: "Not authenticated" };
   }
 
-  const adminClient = createSupabaseAdminClient();
-
-  // Create template
-  const { data: template, error: templateError } = await adminClient
+  const { data: template, error: templateError } = await supabase
     .from("interview_templates")
-    .insert({ name: name.trim(), org_id: org.orgId })
-    .select("id")
+    .insert({ org_id: org.orgId, name })
+    .select()
     .single();
 
   if (templateError) {
-    throw new Error(templateError.message);
+    return { error: templateError.message };
   }
 
-  // Create initial version
-  const { error: versionError } = await adminClient
-    .from("interview_template_versions")
+  // Create initial draft version
+  const { error: versionError } = await supabase
+    .from("template_versions")
     .insert({
       template_id: template.id,
       version: 1,
-      config: DEFAULT_CONFIG,
+      config: {
+        system_prompt: "You are a professional interviewer.",
+        voice: { voice_id: "alloy", speed: 1.0 },
+        questions: [],
+        policies: { max_followups_per_question: 1, min_answer_seconds: 5 },
+      },
+      status: "draft",
     });
 
   if (versionError) {
-    throw new Error(versionError.message);
+    return { error: versionError.message };
   }
 
   revalidatePath("/admin/templates");
+  return { templateId: template.id };
 }
 
 export async function updateTemplateVersion(
   versionId: string,
-  config: unknown
-): Promise<void> {
-  const validatedConfig = validateTemplateConfig(config);
-
-  // Verify user has access
+  config: Record<string, unknown>
+) {
+  const supabase = await createSupabaseServerClient();
   const org = await getCurrentOrg();
+  
   if (!org) {
-    throw new Error("No organization found");
+    return { error: "Not authenticated" };
   }
 
-  const adminClient = createSupabaseAdminClient();
+  const { error } = await supabase
+    .from("template_versions")
+    .update({ config })
+    .eq("id", versionId);
 
-  // Get version
-  const { data: version } = await adminClient
-    .from("interview_template_versions")
-    .select("published_at, template_id")
+  if (error) {
+    return { error: error.message };
+  }
+
+  revalidatePath("/admin/templates");
+  return { success: true };
+}
+
+export async function publishTemplateVersion(versionId: string) {
+  const supabase = await createSupabaseServerClient();
+  const org = await getCurrentOrg();
+  
+  if (!org) {
+    return { error: "Not authenticated" };
+  }
+
+  // Get the template_id for this version
+  const { data: version } = await supabase
+    .from("template_versions")
+    .select("template_id")
     .eq("id", versionId)
     .single();
 
   if (!version) {
-    throw new Error("Version not found");
+    return { error: "Version not found" };
   }
 
-  // Get template to verify org
-  const { data: template } = await adminClient
-    .from("interview_templates")
-    .select("org_id")
-    .eq("id", version.template_id)
-    .single();
+  // Unpublish any existing published versions
+  await supabase
+    .from("template_versions")
+    .update({ status: "archived" })
+    .eq("template_id", version.template_id)
+    .eq("status", "published");
 
-  if (!template || template.org_id !== org.orgId) {
-    throw new Error("Unauthorized");
-  }
-
-  if (version.published_at) {
-    throw new Error("Cannot update a published version");
-  }
-
-  const { error } = await adminClient
-    .from("interview_template_versions")
-    .update({ config: validatedConfig })
+  // Publish this version
+  const { error } = await supabase
+    .from("template_versions")
+    .update({ status: "published" })
     .eq("id", versionId);
 
   if (error) {
-    throw new Error(error.message);
+    return { error: error.message };
   }
 
   revalidatePath("/admin/templates");
+  return { success: true };
 }
 
-export async function publishTemplateVersion(versionId: string): Promise<void> {
-  // Verify user has access
-  const org = await getCurrentOrg();
-  if (!org) {
-    throw new Error("No organization found");
-  }
-
-  const adminClient = createSupabaseAdminClient();
-
-  // Get version
-  const { data: version, error: fetchError } = await adminClient
-    .from("interview_template_versions")
-    .select("template_id, config, published_at")
-    .eq("id", versionId)
-    .single();
-
-  if (fetchError || !version) {
-    throw new Error("Version not found");
-  }
-
-  // Get template to verify org
-  const { data: template } = await adminClient
-    .from("interview_templates")
-    .select("org_id")
-    .eq("id", version.template_id)
-    .single();
-
-  if (!template || template.org_id !== org.orgId) {
-    throw new Error("Unauthorized");
-  }
-
-  if (version.published_at) {
-    throw new Error("Version is already published");
-  }
-
-  // Validate config before publishing
-  validateTemplateConfig(version.config);
-
-  // Set published_at
-  const { error: publishError } = await adminClient
-    .from("interview_template_versions")
-    .update({ published_at: new Date().toISOString() })
-    .eq("id", versionId);
-
-  if (publishError) {
-    throw new Error(publishError.message);
-  }
-
-  // Update template's active_version_id and status
-  const { error: templateError } = await adminClient
-    .from("interview_templates")
-    .update({ active_version_id: versionId, status: "published" })
-    .eq("id", version.template_id);
-
-  if (templateError) {
-    throw new Error(templateError.message);
-  }
-
-  revalidatePath("/admin/templates");
-}

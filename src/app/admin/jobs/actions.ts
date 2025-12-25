@@ -1,112 +1,60 @@
 "use server";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getCurrentOrg } from "@/lib/supabase/helpers";
-import { createJobSchema, updateJobSchema } from "@/types/job";
 import { revalidatePath } from "next/cache";
+import { createJobSchema, updateJobSchema } from "@/types/job";
 
 export async function createJob(formData: FormData) {
   const supabase = await createSupabaseServerClient();
   const org = await getCurrentOrg();
-
+  
   if (!org) {
-    return { error: "Not authenticated or no organization" };
+    return { error: "Not authenticated" };
   }
 
-  const rawData = {
-    title: formData.get("title") as string,
-    description: formData.get("description") as string,
-    location: formData.get("location") as string,
-    employment_type: formData.get("employment_type") as string,
-    hourly_rate_min: formData.get("hourly_rate_min") 
-      ? parseFloat(formData.get("hourly_rate_min") as string) 
-      : undefined,
-    hourly_rate_max: formData.get("hourly_rate_max")
-      ? parseFloat(formData.get("hourly_rate_max") as string)
-      : undefined,
-    template_id: formData.get("template_id") as string || undefined,
-    status: "draft",
-  };
-
-  const parsed = createJobSchema.safeParse(rawData);
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0].message };
-  }
-
-  const { data, error } = await supabase
-    .from("job_postings")
-    .insert({
-      ...parsed.data,
-      org_id: org.orgId,
-    })
-    .select()
-    .single();
-
-  if (error) {
-    return { error: error.message };
-  }
-
-  revalidatePath("/admin/jobs");
-  return { data };
-}
-
-export async function updateJob(jobId: string, formData: FormData) {
-  const supabase = await createSupabaseServerClient();
-  const org = await getCurrentOrg();
-
-  if (!org) {
-    return { error: "Not authenticated or no organization" };
-  }
-
-  const rawData = {
-    title: formData.get("title") as string,
-    description: formData.get("description") as string,
-    location: formData.get("location") as string,
-    employment_type: formData.get("employment_type") as string,
+  const data = {
+    title: formData.get("title"),
+    description: formData.get("description") || undefined,
+    location: formData.get("location") || undefined,
+    employment_type: formData.get("employment_type") || "full_time",
     hourly_rate_min: formData.get("hourly_rate_min")
-      ? parseFloat(formData.get("hourly_rate_min") as string)
+      ? Number(formData.get("hourly_rate_min"))
       : undefined,
     hourly_rate_max: formData.get("hourly_rate_max")
-      ? parseFloat(formData.get("hourly_rate_max") as string)
+      ? Number(formData.get("hourly_rate_max"))
       : undefined,
-    template_id: formData.get("template_id") as string || undefined,
-    status: formData.get("status") as string,
+    template_id: formData.get("template_id") || undefined,
   };
 
-  const parsed = updateJobSchema.safeParse(rawData);
+  const parsed = createJobSchema.safeParse(data);
   if (!parsed.success) {
-    return { error: parsed.error.issues[0].message };
+    return { error: parsed.error.issues[0]?.message || "Invalid data" };
   }
 
-  const { data, error } = await supabase
-    .from("job_postings")
-    .update(parsed.data)
-    .eq("id", jobId)
-    .select()
-    .single();
-
-  if (error) {
-    return { error: error.message };
+  // Get the published template version if template is selected
+  let templateVersionId = null;
+  if (parsed.data.template_id) {
+    const { data: version } = await supabase
+      .from("template_versions")
+      .select("id")
+      .eq("template_id", parsed.data.template_id)
+      .eq("status", "published")
+      .single();
+    templateVersionId = version?.id;
   }
 
-  revalidatePath("/admin/jobs");
-  revalidatePath(`/admin/jobs/${jobId}`);
-  return { data };
-}
-
-export async function deleteJob(jobId: string) {
-  const supabase = await createSupabaseServerClient();
-  const org = await getCurrentOrg();
-
-  if (!org) {
-    return { error: "Not authenticated or no organization" };
-  }
-
-  const { error } = await supabase
-    .from("job_postings")
-    .delete()
-    .eq("id", jobId);
+  const { error } = await supabase.from("job_postings").insert({
+    org_id: org.orgId,
+    title: parsed.data.title,
+    description: parsed.data.description,
+    location: parsed.data.location,
+    employment_type: parsed.data.employment_type,
+    hourly_rate_min: parsed.data.hourly_rate_min,
+    hourly_rate_max: parsed.data.hourly_rate_max,
+    template_version_id: templateVersionId,
+    status: "draft",
+  });
 
   if (error) {
     return { error: error.message };
@@ -116,75 +64,108 @@ export async function deleteJob(jobId: string) {
   return { success: true };
 }
 
-export async function publishJob(jobId: string) {
+export async function updateJob(jobId: string, formData: FormData) {
   const supabase = await createSupabaseServerClient();
+  const org = await getCurrentOrg();
   
-  const { data, error } = await supabase
+  if (!org) {
+    return { error: "Not authenticated" };
+  }
+
+  const data = {
+    title: formData.get("title"),
+    description: formData.get("description") || undefined,
+    location: formData.get("location") || undefined,
+    employment_type: formData.get("employment_type") || undefined,
+    hourly_rate_min: formData.get("hourly_rate_min")
+      ? Number(formData.get("hourly_rate_min"))
+      : undefined,
+    hourly_rate_max: formData.get("hourly_rate_max")
+      ? Number(formData.get("hourly_rate_max"))
+      : undefined,
+    status: formData.get("status") || undefined,
+    template_id: formData.get("template_id") || undefined,
+  };
+
+  const parsed = updateJobSchema.safeParse(data);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message || "Invalid data" };
+  }
+
+  // Get the published template version if template is selected
+  let templateVersionId = undefined;
+  if (parsed.data.template_id) {
+    const { data: version } = await supabase
+      .from("template_versions")
+      .select("id")
+      .eq("template_id", parsed.data.template_id)
+      .eq("status", "published")
+      .single();
+    templateVersionId = version?.id;
+  }
+
+  const updateData: Record<string, unknown> = { ...parsed.data };
+  delete updateData.template_id;
+  if (templateVersionId !== undefined) {
+    updateData.template_version_id = templateVersionId;
+  }
+
+  const { error } = await supabase
     .from("job_postings")
-    .update({ status: "active" })
+    .update(updateData)
     .eq("id", jobId)
-    .select()
-    .single();
+    .eq("org_id", org.orgId);
 
   if (error) {
     return { error: error.message };
   }
 
   revalidatePath("/admin/jobs");
-  return { data };
+  revalidatePath(`/admin/jobs/${jobId}`);
+  return { success: true };
 }
 
-export async function getJobs() {
+export async function publishJob(jobId: string) {
   const supabase = await createSupabaseServerClient();
   const org = await getCurrentOrg();
-
+  
   if (!org) {
-    return { error: "Not authenticated", data: [] };
+    return { error: "Not authenticated" };
   }
 
-  const { data, error } = await supabase
+  const { error } = await supabase
     .from("job_postings")
-    .select("*, interview_templates(id, name)")
-    .eq("org_id", org.orgId)
-    .order("created_at", { ascending: false });
+    .update({ status: "active" })
+    .eq("id", jobId)
+    .eq("org_id", org.orgId);
 
   if (error) {
-    return { error: error.message, data: [] };
+    return { error: error.message };
   }
 
-  return { data };
+  revalidatePath("/admin/jobs");
+  revalidatePath(`/admin/jobs/${jobId}`);
+  return { success: true };
 }
 
-export async function getJob(jobId: string) {
+export async function deleteJob(jobId: string) {
   const supabase = await createSupabaseServerClient();
+  const org = await getCurrentOrg();
+  
+  if (!org) {
+    return { error: "Not authenticated" };
+  }
 
-  const { data, error } = await supabase
+  const { error } = await supabase
     .from("job_postings")
-    .select("*, interview_templates(id, name)")
+    .delete()
     .eq("id", jobId)
-    .single();
+    .eq("org_id", org.orgId);
 
   if (error) {
     return { error: error.message };
   }
 
-  return { data };
+  revalidatePath("/admin/jobs");
+  return { success: true };
 }
-
-export async function getPublicJob(jobId: string) {
-  const admin = createSupabaseAdminClient();
-
-  const { data, error } = await admin
-    .from("job_postings")
-    .select("id, title, description, location, employment_type, hourly_rate_min, hourly_rate_max, requirements, org_id, organizations(name)")
-    .eq("id", jobId)
-    .eq("status", "active")
-    .single();
-
-  if (error) {
-    return { error: error.message };
-  }
-
-  return { data };
-}
-

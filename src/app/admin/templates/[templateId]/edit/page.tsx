@@ -1,74 +1,67 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getCurrentOrg } from "@/lib/supabase/helpers";
-import { redirect } from "next/navigation";
-import Link from "next/link";
+import { redirect, notFound } from "next/navigation";
 import { TemplateEditor } from "./TemplateEditor";
 
-type Params = Promise<{ templateId: string }>;
+interface Props {
+  params: Promise<{ templateId: string }>;
+}
 
-export default async function EditTemplatePage({ params }: { params: Params }) {
+export default async function EditTemplatePage({ params }: Props) {
   const { templateId } = await params;
-  
+  const supabase = await createSupabaseServerClient();
   const org = await getCurrentOrg();
+  
   if (!org) {
-    redirect("/");
+    redirect("/login");
   }
 
-  const supabase = await createSupabaseServerClient();
-
-  // Get template
   const { data: template } = await supabase
     .from("interview_templates")
-    .select("id, name, status, org_id")
+    .select(`
+      id,
+      name,
+      template_versions (
+        id,
+        version,
+        config,
+        status,
+        created_at
+      )
+    `)
     .eq("id", templateId)
     .eq("org_id", org.orgId)
     .single();
 
   if (!template) {
-    redirect("/admin/templates");
+    notFound();
   }
 
-  // Get latest version
-  const { data: version } = await supabase
-    .from("interview_template_versions")
-    .select("id, version, config, published_at")
-    .eq("template_id", templateId)
-    .order("version", { ascending: false })
-    .limit(1)
-    .single();
+  const versions = template.template_versions as Array<{
+    id: string;
+    version: number;
+    config: Record<string, unknown>;
+    status: string;
+    created_at: string;
+  }>;
+
+  // Get the latest version (draft or published)
+  const latestVersion = versions?.sort((a, b) => b.version - a.version)[0];
 
   return (
-    <div className="min-h-screen bg-zinc-900 p-8">
+    <div className="min-h-screen bg-zinc-900 text-white p-8">
       <div className="max-w-4xl mx-auto">
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-2xl font-bold text-white">{template.name}</h1>
-            <p className="text-zinc-500 text-sm">
-              Version {version?.version ?? 1} •{" "}
-              {version?.published_at ? (
-                <span className="text-green-400">Published</span>
-              ) : (
-                <span className="text-yellow-400">Draft</span>
-              )}
-            </p>
-          </div>
-          <Link
-            href="/admin/templates"
-            className="text-zinc-400 hover:text-white"
-          >
-            ← Back to templates
-          </Link>
-        </div>
+        <h1 className="text-3xl font-bold mb-2">{template.name}</h1>
+        <p className="text-zinc-400 mb-8">
+          Version {latestVersion?.version || 1} ({latestVersion?.status || "draft"})
+        </p>
 
-        {version && (
-          <TemplateEditor
-            versionId={version.id}
-            config={version.config}
-            isPublished={!!version.published_at}
-          />
-        )}
+        <TemplateEditor
+          versionId={latestVersion?.id || ""}
+          initialConfig={latestVersion?.config || {}}
+          status={latestVersion?.status || "draft"}
+        />
       </div>
     </div>
   );
 }
-

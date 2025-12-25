@@ -1,50 +1,52 @@
 "use server";
 
-import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getCurrentOrg } from "@/lib/supabase/helpers";
 import { revalidatePath } from "next/cache";
+import crypto from "crypto";
 
-export async function createInterview(formData: FormData): Promise<{ accessToken: string } | { error: string }> {
+export async function createInterview(formData: FormData) {
+  const supabase = await createSupabaseServerClient();
+  const org = await getCurrentOrg();
+  
+  if (!org) {
+    return { error: "Not authenticated" };
+  }
+
+  const templateId = formData.get("templateId") as string;
   const candidateName = formData.get("candidateName") as string;
   const candidateEmail = formData.get("candidateEmail") as string;
-  const templateId = formData.get("templateId") as string;
 
-  if (!candidateName?.trim()) {
-    return { error: "Candidate name is required" };
-  }
-  if (!templateId) {
-    return { error: "Template is required" };
+  if (!templateId || !candidateName || !candidateEmail) {
+    return { error: "All fields are required" };
   }
 
-  const org = await getCurrentOrg();
-  if (!org) {
-    return { error: "No organization found" };
-  }
-
-  const adminClient = createSupabaseAdminClient();
-
-  // Get the active version of the template
-  const { data: template } = await adminClient
-    .from("interview_templates")
-    .select("active_version_id")
-    .eq("id", templateId)
-    .eq("org_id", org.orgId)
+  // Get the published version of the template
+  const { data: version } = await supabase
+    .from("template_versions")
+    .select("id")
+    .eq("template_id", templateId)
+    .eq("status", "published")
     .single();
 
-  if (!template?.active_version_id) {
-    return { error: "Template has no published version" };
+  if (!version) {
+    return { error: "No published version found for this template" };
   }
 
-  // Create interview
-  const { data: interview, error } = await adminClient
+  // Generate unique token for candidate link
+  const token = crypto.randomBytes(32).toString("hex");
+
+  const { data: interview, error } = await supabase
     .from("interviews")
     .insert({
       org_id: org.orgId,
-      template_version_id: template.active_version_id,
-      candidate_name: candidateName.trim(),
-      candidate_email: candidateEmail?.trim() || null,
+      template_version_id: version.id,
+      candidate_name: candidateName,
+      candidate_email: candidateEmail,
+      token,
+      status: "pending",
     })
-    .select("id, access_token")
+    .select()
     .single();
 
   if (error) {
@@ -52,7 +54,9 @@ export async function createInterview(formData: FormData): Promise<{ accessToken
   }
 
   revalidatePath("/admin/interviews");
-  
-  return { accessToken: interview.access_token };
+  return { 
+    success: true, 
+    interviewId: interview.id,
+    token: interview.token,
+  };
 }
-
