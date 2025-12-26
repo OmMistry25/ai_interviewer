@@ -43,8 +43,8 @@ export async function createInterview(formData: FormData) {
       template_version_id: version.id,
       candidate_name: candidateName,
       candidate_email: candidateEmail,
-      token,
-      status: "pending",
+      access_token: token,
+      status: "scheduled",
     })
     .select()
     .single();
@@ -57,6 +57,6 @@ export async function createInterview(formData: FormData) {
   return { 
     success: true, 
     interviewId: interview.id,
-    token: interview.token,
+    token: interview.access_token,
   };
 }

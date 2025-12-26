@@ -40,7 +40,7 @@ export default async function InterviewDetailPage({ params }: Props) {
     interview_templates: { name: string } | null;
   } | null;
 
-  const interviewUrl = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/candidate/interview/${interview.token}`;
+  const interviewUrl = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/candidate/interview/${interview.access_token}`;
 
   return (
     <div className="min-h-screen bg-zinc-900 text-white p-8">
@@ -60,7 +60,7 @@ export default async function InterviewDetailPage({ params }: Props) {
             className={`px-3 py-1 rounded-full text-sm font-medium ${
               interview.status === "completed"
                 ? "bg-emerald-900 text-emerald-300"
-                : interview.status === "in_progress"
+                : interview.status === "live"
                 ? "bg-yellow-900 text-yellow-300"
                 : "bg-zinc-700 text-zinc-300"
             }`}
@@ -70,7 +70,7 @@ export default async function InterviewDetailPage({ params }: Props) {
         </div>
 
         {/* Interview Link */}
-        {interview.status === "pending" && (
+        {interview.status === "scheduled" && (
           <div className="bg-zinc-800 rounded-lg p-6 border border-zinc-700 mb-6">
             <h2 className="text-lg font-semibold mb-2">Interview Link</h2>
             <p className="text-zinc-400 text-sm mb-3">Share this link with the candidate:</p>

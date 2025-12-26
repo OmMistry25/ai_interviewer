@@ -89,7 +89,7 @@ export default async function InterviewsPage() {
                     className={`px-2 py-1 rounded text-xs font-medium ${
                       interview.status === "completed"
                         ? "bg-emerald-900 text-emerald-300"
-                        : interview.status === "in_progress"
+                        : interview.status === "live"
                         ? "bg-yellow-900 text-yellow-300"
                         : "bg-zinc-700 text-zinc-300"
                     }`}

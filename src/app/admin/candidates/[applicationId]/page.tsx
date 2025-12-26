@@ -22,7 +22,7 @@ export default async function CandidateDetailPage({ params }: Props) {
     .select(`
       id,
       status,
-      resume_url,
+      resume_path,
       resume_analysis,
       created_at,
       candidates (
