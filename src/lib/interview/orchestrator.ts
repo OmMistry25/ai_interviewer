@@ -103,13 +103,57 @@ export async function startInterview(interviewId: string): Promise<void> {
 }
 
 /**
- * Mark interview as completed
+ * Mark interview as completed and save transcript/scores
  */
 export async function completeInterview(interviewId: string): Promise<void> {
   const adminClient = createSupabaseAdminClient();
+
+  // Get transcript from interview_turns
+  const { data: turns } = await adminClient
+    .from("interview_turns")
+    .select("speaker, transcript, created_at")
+    .eq("interview_id", interviewId)
+    .order("created_at", { ascending: true });
+
+  // Format transcript as array of messages
+  const transcript = (turns || []).map((turn) => ({
+    role: turn.speaker === "ai" ? "assistant" : "user",
+    content: turn.transcript,
+  }));
+
+  // Get scores from evaluations
+  const { data: evaluation } = await adminClient
+    .from("evaluations")
+    .select("scores")
+    .eq("interview_id", interviewId)
+    .single();
+
+  const scores = evaluation?.scores || null;
+
+  // Generate a simple summary from the scores
+  let summary: string | null = null;
+  if (scores && typeof scores === "object") {
+    const scoresObj = scores as { totalScore?: number; signals?: Record<string, { score: number }> };
+    const totalScore = scoresObj.totalScore ?? 0;
+    const signals = scoresObj.signals || {};
+    
+    const signalSummary = Object.entries(signals)
+      .map(([name, data]) => `${name}: ${Math.round(data.score * 100)}%`)
+      .join(", ");
+    
+    summary = `Overall Score: ${Math.round(totalScore * 100)}%\n\nSignal Breakdown: ${signalSummary || "No signals recorded"}`;
+  }
+
+  // Update interview with all data
   await adminClient
     .from("interviews")
-    .update({ status: "completed", completed_at: new Date().toISOString() })
+    .update({
+      status: "completed",
+      completed_at: new Date().toISOString(),
+      transcript,
+      scores,
+      summary,
+    })
     .eq("id", interviewId);
 }
 
