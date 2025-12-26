@@ -40,17 +40,20 @@ export async function scheduleInterview(
   // Get the published template version
   let templateVersionId: string | null = null;
   if (params.templateId) {
-    const { data: template } = await admin
-      .from("interview_templates")
-      .select("active_version_id")
-      .eq("id", params.templateId)
+    const { data: version } = await admin
+      .from("interview_template_versions")
+      .select("id")
+      .eq("template_id", params.templateId)
+      .not("published_at", "is", null)
+      .order("published_at", { ascending: false })
+      .limit(1)
       .single();
 
-    templateVersionId = template?.active_version_id || null;
+    templateVersionId = version?.id || null;
   }
 
   if (!templateVersionId) {
-    return { success: false, error: "No interview template configured for this job" };
+    return { success: false, error: "No published interview template found for this job" };
   }
 
   // Generate interview access token
