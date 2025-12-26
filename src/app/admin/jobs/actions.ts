@@ -32,18 +32,6 @@ export async function createJob(formData: FormData) {
     return { error: parsed.error.issues[0]?.message || "Invalid data" };
   }
 
-  // Get the published template version if template is selected
-  let templateVersionId = null;
-  if (parsed.data.template_id) {
-    const { data: version } = await supabase
-      .from("interview_template_versions")
-      .select("id")
-      .eq("template_id", parsed.data.template_id)
-      .not("published_at", "is", null)
-      .single();
-    templateVersionId = version?.id;
-  }
-
   const { error } = await supabase.from("job_postings").insert({
     org_id: org.orgId,
     title: parsed.data.title,
@@ -52,7 +40,7 @@ export async function createJob(formData: FormData) {
     employment_type: parsed.data.employment_type,
     hourly_rate_min: parsed.data.hourly_rate_min,
     hourly_rate_max: parsed.data.hourly_rate_max,
-    template_version_id: templateVersionId,
+    template_id: parsed.data.template_id || null,
     status: "draft",
   });
 
@@ -92,23 +80,7 @@ export async function updateJob(jobId: string, formData: FormData) {
     return { error: parsed.error.issues[0]?.message || "Invalid data" };
   }
 
-  // Get the published template version if template is selected
-  let templateVersionId = undefined;
-  if (parsed.data.template_id) {
-    const { data: version } = await supabase
-      .from("interview_template_versions")
-      .select("id")
-      .eq("template_id", parsed.data.template_id)
-      .not("published_at", "is", null)
-      .single();
-    templateVersionId = version?.id;
-  }
-
   const updateData: Record<string, unknown> = { ...parsed.data };
-  delete updateData.template_id;
-  if (templateVersionId !== undefined) {
-    updateData.template_version_id = templateVersionId;
-  }
 
   const { error } = await supabase
     .from("job_postings")
