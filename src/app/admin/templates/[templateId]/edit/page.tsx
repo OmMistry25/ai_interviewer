@@ -26,7 +26,7 @@ export default async function EditTemplatePage({ params }: Props) {
       id,
       name,
       org_id,
-      interview_template_versions (
+      interview_template_versions!interview_template_versions_template_id_fkey (
         id,
         version,
         config,

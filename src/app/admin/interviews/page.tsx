@@ -18,7 +18,7 @@ export default async function InterviewsPage() {
     .select(`
       id,
       name,
-      interview_template_versions!inner (
+      interview_template_versions!interview_template_versions_template_id_fkey (
         id,
         published_at
       )

@@ -17,7 +17,7 @@ export default async function NewJobPage() {
     .select(`
       id,
       name,
-      interview_template_versions!inner (
+      interview_template_versions!interview_template_versions_template_id_fkey (
         published_at
       )
     `)
