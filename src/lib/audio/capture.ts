@@ -12,16 +12,18 @@ export interface AudioCaptureOptions {
   onSpeechResume?: () => void;
   /** Called when pause threshold is reached and answer should be submitted */
   onPauseComplete?: () => void;
-  /** Called with progress during the visual feedback period (3-5s) */
+  /** Called with progress during the visual feedback period */
   onPauseProgress?: (progress: number) => void;
   /** Called when speech is detected (for interruption handling) */
   onSpeechDetected?: () => void;
   /** RMS threshold below which is considered silence */
   silenceThreshold?: number;
-  /** Time before starting visual countdown (ms) - default 3000 */
+  /** Time before starting visual countdown (ms) - default 1500 */
   silenceDelayMs?: number;
-  /** Total time of silence before submitting (ms) - default 5000 */
+  /** Total time of silence before submitting (ms) - default 3500 */
   silenceThresholdMs?: number;
+  /** Minimum speech duration (ms) before pause detection activates - default 500 */
+  minSpeechDurationMs?: number;
   /** Existing MediaStream to use instead of requesting a new one */
   existingStream?: MediaStream;
 }
@@ -39,6 +41,11 @@ export class AudioCapture {
   private silenceStartTime: number | null = null;
   private lastProgressUpdate = 0;
   private hasSpoken = false; // Track if user has spoken at all
+  
+  // New: Detection control and speech duration tracking
+  private detectionEnabled = true; // When false, ignore all detection (AI is speaking)
+  private speechStartTime: number | null = null; // When current speech segment started
+  private cumulativeSpeechMs = 0; // Total speech time for this answer
 
   constructor(options: AudioCaptureOptions = {}) {
     this.options = {
@@ -49,9 +56,10 @@ export class AudioCapture {
       onPauseComplete: options.onPauseComplete ?? (() => {}),
       onPauseProgress: options.onPauseProgress ?? (() => {}),
       onSpeechDetected: options.onSpeechDetected ?? (() => {}),
-      silenceThreshold: options.silenceThreshold ?? 0.015,
-      silenceDelayMs: options.silenceDelayMs ?? 3000,
-      silenceThresholdMs: options.silenceThresholdMs ?? 5000,
+      silenceThreshold: options.silenceThreshold ?? 0.02, // Raised from 0.015
+      silenceDelayMs: options.silenceDelayMs ?? 1500, // Reduced from 3000
+      silenceThresholdMs: options.silenceThresholdMs ?? 3500, // Reduced from 5000
+      minSpeechDurationMs: options.minSpeechDurationMs ?? 500, // New: minimum speech before pause detection
       existingStream: options.existingStream,
     };
   }
@@ -106,6 +114,11 @@ export class AudioCapture {
   }
 
   private detectSilence(pcmData: Float32Array): void {
+    // Skip all detection if disabled (AI is speaking)
+    if (!this.detectionEnabled) {
+      return;
+    }
+
     // Calculate RMS (root mean square) for volume level
     let sum = 0;
     for (let i = 0; i < pcmData.length; i++) {
@@ -117,8 +130,16 @@ export class AudioCapture {
     const isSpeaking = rms >= this.options.silenceThreshold;
 
     if (isSpeaking) {
-      // User is speaking
+      // User is speaking - notify for potential interruption
       this.options.onSpeechDetected();
+      
+      // Track speech duration
+      if (this.speechStartTime === null) {
+        this.speechStartTime = now;
+      }
+      
+      // Update cumulative speech time
+      const currentSpeechDuration = now - this.speechStartTime;
       
       if (this.isSilent && this.hasSpoken) {
         // Was silent, now speaking again - resume
@@ -126,20 +147,31 @@ export class AudioCapture {
         this.options.onPauseProgress(0); // Reset progress
       }
       
-      this.hasSpoken = true;
+      // Only mark as "really spoken" after minimum speech duration
+      if (this.cumulativeSpeechMs + currentSpeechDuration >= this.options.minSpeechDurationMs) {
+        this.hasSpoken = true;
+      }
+      
       this.isSilent = false;
       this.silenceStartTime = null;
       this.lastProgressUpdate = 0;
     } else {
       // User is silent
+      
+      // If we were speaking, add that duration to cumulative
+      if (!this.isSilent && this.speechStartTime !== null) {
+        this.cumulativeSpeechMs += now - this.speechStartTime;
+        this.speechStartTime = null;
+      }
+      
       if (!this.isSilent && this.hasSpoken) {
-        // Just became silent after speaking
+        // Just became silent after sufficient speaking
         this.silenceStartTime = now;
         this.options.onSilenceStart();
       }
       this.isSilent = true;
 
-      // Calculate pause progress if we've been silent
+      // Calculate pause progress if we've been silent AND have really spoken
       if (this.silenceStartTime && this.hasSpoken) {
         const silenceDuration = now - this.silenceStartTime;
         
@@ -148,8 +180,9 @@ export class AudioCapture {
           this.options.onPauseComplete();
           this.silenceStartTime = null;
           this.hasSpoken = false;
+          this.cumulativeSpeechMs = 0;
         } else if (silenceDuration >= this.options.silenceDelayMs) {
-          // In visual feedback period (3-5s)
+          // In visual feedback period
           const progressDuration = this.options.silenceThresholdMs - this.options.silenceDelayMs;
           const progressTime = silenceDuration - this.options.silenceDelayMs;
           const progress = Math.min(1, progressTime / progressDuration);
@@ -172,13 +205,40 @@ export class AudioCapture {
   }
 
   /**
-   * Reset pause detection (use when AI starts speaking)
+   * Disable all detection (use when AI starts speaking a question)
+   * Prevents background noise from triggering interruption
+   */
+  disableDetection(): void {
+    this.detectionEnabled = false;
+    this.resetPauseDetection();
+  }
+
+  /**
+   * Enable detection (use when AI finishes speaking)
+   * Starts listening for candidate's answer
+   */
+  enableDetection(): void {
+    this.detectionEnabled = true;
+    this.resetPauseDetection();
+  }
+
+  /**
+   * Check if detection is currently enabled
+   */
+  isDetectionEnabled(): boolean {
+    return this.detectionEnabled;
+  }
+
+  /**
+   * Reset pause detection state for next answer
    */
   resetPauseDetection(): void {
     this.silenceStartTime = null;
     this.hasSpoken = false;
     this.isSilent = true;
     this.lastProgressUpdate = 0;
+    this.speechStartTime = null;
+    this.cumulativeSpeechMs = 0;
     this.options.onPauseProgress(0);
   }
 

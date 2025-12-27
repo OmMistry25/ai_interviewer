@@ -7,7 +7,7 @@ import { AIAvatar } from "@/components/AIAvatar";
 import { PauseIndicator } from "@/components/PauseIndicator";
 import { AudioCapture } from "@/lib/audio/capture";
 import { AudioBuffer } from "@/lib/audio/buffer";
-import { speakText, stopSpeaking, isSpeaking } from "@/lib/audio/tts-client";
+import { speakText, stopSpeaking } from "@/lib/audio/tts-client";
 
 interface InterviewRoomProps {
   interviewToken: string;
@@ -51,7 +51,6 @@ export function InterviewRoom({ interviewToken, candidateName }: InterviewRoomPr
   const audioCaptureRef = useRef<AudioCapture | null>(null);
   const audioBufferRef = useRef<AudioBuffer | null>(null);
   const isProcessingRef = useRef(false);
-  const wasInterruptedRef = useRef(false);
   const pendingInterviewStartRef = useRef<string | null>(null);
   const credentialsRef = useRef<RtcCredentials | null>(null);
   const phaseRef = useRef<InterviewPhase>("not_started");
@@ -129,12 +128,12 @@ export function InterviewRoom({ interviewToken, candidateName }: InterviewRoomPr
         throw new Error(nextData.error || "Failed to process answer");
       }
 
-      // Reset audio capture for next response
-      audioCaptureRef.current?.resetPauseDetection();
-
       // Handle response
       if (nextData.action === "complete") {
         addMessage("interviewer", "Thank you for completing the interview!");
+        
+        // Disable detection for final message
+        audioCaptureRef.current?.disableDetection();
         setPhase("ai_speaking");
         await speakText(
           "Thank you for completing the interview. We will be in touch soon."
@@ -156,16 +155,18 @@ export function InterviewRoom({ interviewToken, candidateName }: InterviewRoomPr
         setFollowupsUsed(nextData.followupsUsed);
         addMessage("interviewer", nextData.prompt);
 
+        // Disable detection while AI speaks follow-up
+        audioCaptureRef.current?.disableDetection();
         setPhase("ai_speaking");
+        
         await speakText(nextData.prompt, {
           interviewId: creds.interviewId,
           questionId: currentQuestionRef.current?.id,
         });
 
-        if (!wasInterruptedRef.current) {
-          setPhase("listening");
-        }
-        wasInterruptedRef.current = false;
+        // Enable detection after follow-up is complete
+        audioCaptureRef.current?.enableDetection();
+        setPhase("listening");
         isProcessingRef.current = false;
         return;
       }
@@ -181,16 +182,18 @@ export function InterviewRoom({ interviewToken, candidateName }: InterviewRoomPr
 
         addMessage("interviewer", nextData.question.prompt);
 
+        // Disable detection while AI speaks next question
+        audioCaptureRef.current?.disableDetection();
         setPhase("ai_speaking");
+        
         await speakText(nextData.question.prompt, {
           interviewId: creds.interviewId,
           questionId: nextData.question.id,
         });
 
-        if (!wasInterruptedRef.current) {
-          setPhase("listening");
-        }
-        wasInterruptedRef.current = false;
+        // Enable detection after question is complete
+        audioCaptureRef.current?.enableDetection();
+        setPhase("listening");
       }
 
       isProcessingRef.current = false;
@@ -200,16 +203,6 @@ export function InterviewRoom({ interviewToken, candidateName }: InterviewRoomPr
       isProcessingRef.current = false;
     }
   }, [addMessage]);
-
-  // Handle interruption (uses refs for stability)
-  const handleInterruption = useCallback(() => {
-    if (phaseRef.current === "ai_speaking" && isSpeaking()) {
-      console.log("Candidate interrupted AI");
-      stopSpeaking();
-      wasInterruptedRef.current = true;
-      setPhase("listening");
-    }
-  }, []);
 
   // Start the actual interview questions
   const startInterviewQuestions = useCallback(async (interviewId: string) => {
@@ -234,16 +227,18 @@ export function InterviewRoom({ interviewToken, candidateName }: InterviewRoomPr
 
       addMessage("interviewer", startData.question.prompt);
 
+      // Disable detection while AI speaks (prevents background noise interruption)
+      audioCaptureRef.current?.disableDetection();
       setPhase("ai_speaking");
+      
       await speakText(startData.question.prompt, {
         interviewId,
         questionId: startData.question.id,
       });
 
-      if (!wasInterruptedRef.current) {
-        setPhase("listening");
-      }
-      wasInterruptedRef.current = false;
+      // Enable detection after question is complete
+      audioCaptureRef.current?.enableDetection();
+      setPhase("listening");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to start interview");
       setPhase("not_started");
@@ -262,6 +257,7 @@ export function InterviewRoom({ interviewToken, candidateName }: InterviewRoomPr
     audioBufferRef.current = new AudioBuffer();
     
     // Create AudioCapture with the shared stream
+    // Uses optimized defaults: 1.5s delay, 3.5s total, 500ms min speech, 0.02 RMS threshold
     const capture = new AudioCapture({
       existingStream: stream,
       onAudioData: (pcm) => {
@@ -287,15 +283,16 @@ export function InterviewRoom({ interviewToken, candidateName }: InterviewRoomPr
           handlePauseComplete();
         }
       },
-      onSpeechDetected: handleInterruption,
-      silenceDelayMs: 3000,
-      silenceThresholdMs: 5000,
+      // No onSpeechDetected - detection is disabled during AI speech anyway
     });
 
     audioCaptureRef.current = capture;
+    
+    // Start with detection disabled until first question is asked
+    capture.disableDetection();
 
     capture.start().then(() => {
-      console.log("AudioCapture started with shared stream");
+      console.log("AudioCapture started with shared stream (detection disabled until AI speaks)");
       
       // If there's a pending interview start, do it now
       if (pendingInterviewStartRef.current) {
@@ -306,7 +303,7 @@ export function InterviewRoom({ interviewToken, candidateName }: InterviewRoomPr
       console.error("Failed to start AudioCapture:", e);
       setError("Failed to initialize audio processing");
     });
-  }, [handlePauseComplete, handleInterruption, startInterviewQuestions]);
+  }, [handlePauseComplete, startInterviewQuestions]);
 
   // Start the interview
   const startInterview = async () => {
