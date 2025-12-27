@@ -64,17 +64,31 @@ export default async function CandidateDetailPage({ params }: Props) {
     id: string;
     status: string;
     transcript: Array<{ role: string; content: string }> | null;
-    scores: Record<string, number> | null;
+    scores: {
+      totalScore?: number;
+      signals?: Record<string, { score: number }>;
+    } | null;
     summary: string | null;
   }> | null;
   const interview = interviews?.[0];
+  
+  // Extract signal scores for display
+  const signalScores = interview?.scores?.signals
+    ? Object.entries(interview.scores.signals).map(([name, data]) => ({
+        name,
+        score: data.score,
+      }))
+    : [];
+  const totalScore = interview?.scores?.totalScore;
   const resumeAnalysis = application.resume_analysis as unknown as {
     summary?: string;
     skills?: string[];
-    experience_years?: number;
-    education?: string;
-    highlights?: string[];
+    years_of_experience?: number | null;
+    education?: string[];
+    relevant_experience?: string[];
+    strengths?: string[];
     concerns?: string[];
+    fit_score?: number;
   } | null;
 
   return (
@@ -133,19 +147,26 @@ export default async function CandidateDetailPage({ params }: Props) {
             )}
 
             <div className="grid grid-cols-2 gap-4 mb-4">
-              {resumeAnalysis.experience_years !== undefined && (
+              {resumeAnalysis.years_of_experience !== undefined && resumeAnalysis.years_of_experience !== null && (
                 <div className="bg-zinc-700 rounded-lg p-3">
                   <p className="text-xs text-zinc-400">Experience</p>
-                  <p className="text-lg font-semibold">{resumeAnalysis.experience_years} years</p>
+                  <p className="text-lg font-semibold">{resumeAnalysis.years_of_experience} years</p>
                 </div>
               )}
-              {resumeAnalysis.education && (
+              {resumeAnalysis.fit_score !== undefined && (
                 <div className="bg-zinc-700 rounded-lg p-3">
-                  <p className="text-xs text-zinc-400">Education</p>
-                  <p className="text-sm">{resumeAnalysis.education}</p>
+                  <p className="text-xs text-zinc-400">Fit Score</p>
+                  <p className="text-lg font-semibold">{resumeAnalysis.fit_score}/10</p>
                 </div>
               )}
             </div>
+
+            {resumeAnalysis.education && resumeAnalysis.education.length > 0 && (
+              <div className="bg-zinc-700 rounded-lg p-3 mb-4">
+                <p className="text-xs text-zinc-400">Education</p>
+                <p className="text-sm">{resumeAnalysis.education.join(", ")}</p>
+              </div>
+            )}
 
             {resumeAnalysis.skills && resumeAnalysis.skills.length > 0 && (
               <div className="mb-4">
@@ -163,12 +184,12 @@ export default async function CandidateDetailPage({ params }: Props) {
               </div>
             )}
 
-            {resumeAnalysis.highlights && resumeAnalysis.highlights.length > 0 && (
+            {resumeAnalysis.strengths && resumeAnalysis.strengths.length > 0 && (
               <div className="mb-4">
-                <p className="text-xs text-zinc-400 mb-2">✓ Highlights</p>
+                <p className="text-xs text-zinc-400 mb-2">✓ Strengths</p>
                 <ul className="list-disc list-inside text-sm text-zinc-300 space-y-1">
-                  {resumeAnalysis.highlights.map((h, i) => (
-                    <li key={i}>{h}</li>
+                  {resumeAnalysis.strengths.map((s, i) => (
+                    <li key={i}>{s}</li>
                   ))}
                 </ul>
               </div>
@@ -188,16 +209,28 @@ export default async function CandidateDetailPage({ params }: Props) {
         )}
 
         {/* Interview Scores */}
-        {interview?.scores && (
+        {signalScores.length > 0 && (
           <div className="bg-zinc-800 rounded-lg p-6 border border-zinc-700 mb-6">
             <h2 className="text-lg font-semibold mb-4">📊 Interview Scores</h2>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {Object.entries(interview.scores).map(([signal, score]) => (
-                <div key={signal} className="text-center p-4 bg-zinc-700 rounded-lg">
+            
+            {/* Overall Score */}
+            {totalScore !== undefined && (
+              <div className="text-center p-4 bg-zinc-700 rounded-lg mb-4">
+                <p className="text-3xl font-bold text-emerald-400">
+                  {Math.round(totalScore * 100)}%
+                </p>
+                <p className="text-sm text-zinc-400">Overall Score</p>
+              </div>
+            )}
+
+            {/* Signal Breakdown */}
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              {signalScores.map(({ name, score }) => (
+                <div key={name} className="text-center p-4 bg-zinc-700 rounded-lg">
                   <p className="text-2xl font-bold text-emerald-400">
                     {Math.round(score * 100)}%
                   </p>
-                  <p className="text-sm text-zinc-400 capitalize">{signal.replace("_", " ")}</p>
+                  <p className="text-sm text-zinc-400 capitalize">{name.replace(/_/g, " ")}</p>
                 </div>
               ))}
             </div>
