@@ -40,18 +40,27 @@ export async function speakText(
   // Stop any currently playing audio first
   stopSpeaking();
 
-  const response = await fetch("/api/speech/tts", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      text,
-      interviewId: options?.interviewId,
-      questionId: options?.questionId,
-    }),
-  });
+  let response: Response;
+  try {
+    response = await fetch("/api/speech/tts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        text,
+        interviewId: options?.interviewId,
+        questionId: options?.questionId,
+      }),
+    });
+  } catch (e) {
+    // Network error or timeout
+    console.error("TTS fetch error:", e);
+    throw new Error("Network error - please check your connection and try again");
+  }
 
   if (!response.ok) {
-    throw new Error("Failed to generate speech");
+    const errorText = await response.text().catch(() => "Unknown error");
+    console.error("TTS API error:", response.status, errorText);
+    throw new Error(`Speech generation failed (${response.status})`);
   }
 
   const audioBlob = await response.blob();

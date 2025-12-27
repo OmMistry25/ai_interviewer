@@ -87,24 +87,34 @@ export function InterviewRoom({ interviewToken, candidateName }: InterviewRoomPr
       const wavBlob = audioBufferRef.current.toWavBlob();
       audioBufferRef.current.clear();
 
-      // Transcribe
+      // Transcribe with retry
       const formData = new FormData();
       formData.append("audio", wavBlob, "audio.wav");
       formData.append("interviewId", creds.interviewId);
 
-      const sttRes = await fetch("/api/speech/stt", {
-        method: "POST",
-        body: formData,
-      });
-
-      const sttData = await sttRes.json();
-      if (!sttRes.ok) {
-        throw new Error(sttData.error || "Failed to transcribe");
+      let sttData;
+      try {
+        const sttRes = await fetch("/api/speech/stt", {
+          method: "POST",
+          body: formData,
+        });
+        sttData = await sttRes.json();
+        if (!sttRes.ok) {
+          throw new Error(sttData.error || "Failed to transcribe");
+        }
+      } catch (e) {
+        console.error("STT error:", e);
+        // On STT failure, let user try again
+        audioCaptureRef.current?.enableDetection();
+        setPhase("listening");
+        isProcessingRef.current = false;
+        return;
       }
 
       const candidateAnswer = sttData.transcript;
 
       if (!candidateAnswer?.trim()) {
+        audioCaptureRef.current?.enableDetection();
         setPhase("listening");
         isProcessingRef.current = false;
         return;
@@ -112,20 +122,27 @@ export function InterviewRoom({ interviewToken, candidateName }: InterviewRoomPr
 
       addMessage("candidate", candidateAnswer);
 
-      // Send to next-turn API
-      const nextRes = await fetch("/api/interviews/next-turn", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          interviewId: creds.interviewId,
-          candidateAnswer,
-          followupsUsed: followupsUsedRef.current,
-        }),
-      });
-
-      const nextData = await nextRes.json();
-      if (!nextRes.ok) {
-        throw new Error(nextData.error || "Failed to process answer");
+      // Send to next-turn API with retry
+      let nextData;
+      try {
+        const nextRes = await fetch("/api/interviews/next-turn", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            interviewId: creds.interviewId,
+            candidateAnswer,
+            followupsUsed: followupsUsedRef.current,
+          }),
+        });
+        nextData = await nextRes.json();
+        if (!nextRes.ok) {
+          throw new Error(nextData.error || "Failed to process answer");
+        }
+      } catch (e) {
+        console.error("Next-turn error:", e);
+        setError("Connection issue - please refresh and continue");
+        isProcessingRef.current = false;
+        return;
       }
 
       // Handle response

@@ -14,6 +14,9 @@ import {
 } from "@/lib/interview/evaluator";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
+// Extend timeout for this route (Vercel Pro: up to 60s, Hobby: 10s max)
+export const maxDuration = 30;
+
 export async function POST(request: NextRequest) {
   try {
     const { interviewId, candidateAnswer, followupsUsed = 0 } = await request.json();

@@ -3,6 +3,9 @@ import OpenAI from "openai";
 import { env } from "@/lib/env";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
+// Extend timeout for TTS generation
+export const maxDuration = 30;
+
 const openai = new OpenAI({
   apiKey: env.OPENAI_API_KEY,
 });
