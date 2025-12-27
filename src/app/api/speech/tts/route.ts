@@ -12,7 +12,7 @@ const openai = new OpenAI({
 
 export async function POST(request: NextRequest) {
   try {
-    const { text, interviewId, questionId } = await request.json();
+    const { text, interviewId, questionId, stream = true } = await request.json();
 
     if (!text) {
       return NextResponse.json(
@@ -21,28 +21,45 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate speech using OpenAI TTS
-    const response = await openai.audio.speech.create({
-      model: "tts-1",
-      voice: "alloy",
-      input: text,
-    });
-
-    // Get audio as buffer
-    const audioBuffer = await response.arrayBuffer();
-
-    // Persist AI turn if interviewId provided
+    // Persist AI turn if interviewId provided (don't wait for this)
     if (interviewId) {
       const adminClient = createSupabaseAdminClient();
-      await adminClient.from("interview_turns").insert({
-        interview_id: interviewId,
-        speaker: "ai",
-        transcript: text,
-        question_id: questionId || null,
+      // Fire and forget - don't block TTS generation
+      Promise.resolve(
+        adminClient.from("interview_turns").insert({
+          interview_id: interviewId,
+          speaker: "ai",
+          transcript: text,
+          question_id: questionId || null,
+        })
+      ).catch(console.error);
+    }
+
+    // Generate speech using OpenAI TTS with streaming
+    const response = await openai.audio.speech.create({
+      model: "tts-1", // Use tts-1 for speed (tts-1-hd for quality)
+      voice: "alloy",
+      input: text,
+      response_format: "mp3", // MP3 streams well
+    });
+
+    // If streaming is requested, return the stream directly
+    if (stream && response.body) {
+      // Get the readable stream from the response
+      const audioStream = response.body;
+
+      return new NextResponse(audioStream as unknown as ReadableStream, {
+        headers: {
+          "Content-Type": "audio/mpeg",
+          "Transfer-Encoding": "chunked",
+          "Cache-Control": "no-cache",
+        },
       });
     }
 
-    // Return audio as binary
+    // Fallback: return complete audio buffer
+    const audioBuffer = await response.arrayBuffer();
+
     return new NextResponse(audioBuffer, {
       headers: {
         "Content-Type": "audio/mpeg",
@@ -57,4 +74,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-

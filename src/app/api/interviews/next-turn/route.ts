@@ -14,7 +14,7 @@ import {
 } from "@/lib/interview/evaluator";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
-// Extend timeout for this route (Vercel Pro: up to 60s, Hobby: 10s max)
+// Extend timeout for this route
 export const maxDuration = 30;
 
 export async function POST(request: NextRequest) {
@@ -28,7 +28,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const state = await loadInterviewState(interviewId);
+    // OPTIMIZATION: Load state and resume context in parallel
+    const [state, resumeContext] = await Promise.all([
+      loadInterviewState(interviewId),
+      loadResumeContext(interviewId),
+    ]);
+
     if (!state) {
       return NextResponse.json(
         { error: "Interview not found" },
@@ -51,10 +56,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Load resume context for personalized evaluation
-    const resumeContext = await loadResumeContext(interviewId);
-
-    // Evaluate the answer with resume context
+    // Evaluate the answer (this is the main bottleneck - now optimized with simpler prompt)
     const evaluation = await evaluateAnswer(
       currentQuestion,
       candidateAnswer,
@@ -62,71 +64,67 @@ export async function POST(request: NextRequest) {
       resumeContext
     );
 
-    // Store the evaluation score for this question
+    // OPTIMIZATION: Fire-and-forget DB operations (don't block response)
     const adminClient = createSupabaseAdminClient();
     const questionId = currentQuestion.id;
     const signal = currentQuestion.rubric?.signal || "general";
     const weight = currentQuestion.rubric?.weight || 0.25;
 
-    // Get or create evaluation record
-    const { data: existingEval } = await adminClient
-      .from("evaluations")
-      .select("scores")
-      .eq("interview_id", interviewId)
-      .single();
+    // Background: Update evaluation scores (don't await)
+    (async () => {
+      try {
+        const { data: existingEval } = await adminClient
+          .from("evaluations")
+          .select("scores")
+          .eq("interview_id", interviewId)
+          .single();
 
-    // Build scores structure
-    const existingScores = (existingEval?.scores as {
-      questionScores?: Record<string, number[]>;
-      signalTotals?: Record<string, { total: number; count: number; weight: number }>;
-    }) || {};
+        const existingScores = (existingEval?.scores as {
+          questionScores?: Record<string, number[]>;
+          signalTotals?: Record<string, { total: number; count: number; weight: number }>;
+        }) || {};
 
-    // Store all scores per question (for transparency)
-    const questionScores = existingScores.questionScores || {};
-    if (!questionScores[questionId]) {
-      questionScores[questionId] = [];
-    }
-    questionScores[questionId].push(evaluation.score);
+        const questionScores = existingScores.questionScores || {};
+        if (!questionScores[questionId]) {
+          questionScores[questionId] = [];
+        }
+        questionScores[questionId].push(evaluation.score);
 
-    // Update signal aggregates (store raw totals, not calculated averages)
-    const signalTotals = existingScores.signalTotals || {};
-    if (!signalTotals[signal]) {
-      signalTotals[signal] = { total: 0, count: 0, weight };
-    }
-    signalTotals[signal].total += evaluation.score;
-    signalTotals[signal].count += 1;
+        const signalTotals = existingScores.signalTotals || {};
+        if (!signalTotals[signal]) {
+          signalTotals[signal] = { total: 0, count: 0, weight };
+        }
+        signalTotals[signal].total += evaluation.score;
+        signalTotals[signal].count += 1;
 
-    // Calculate display scores
-    const signals: Record<string, { score: number; weight: number }> = {};
-    let totalWeighted = 0;
-    let totalWeight = 0;
-    
-    for (const [sig, data] of Object.entries(signalTotals)) {
-      const avgScore = data.count > 0 ? data.total / data.count : 0;
-      signals[sig] = { score: avgScore, weight: data.weight };
-      totalWeighted += avgScore * data.weight;
-      totalWeight += data.weight;
-    }
-    
-    const totalScore = totalWeight > 0 ? totalWeighted / totalWeight : 0;
+        const signals: Record<string, { score: number; weight: number }> = {};
+        let totalWeighted = 0;
+        let totalWeight = 0;
+        
+        for (const [sig, data] of Object.entries(signalTotals)) {
+          const avgScore = data.count > 0 ? data.total / data.count : 0;
+          signals[sig] = { score: avgScore, weight: data.weight };
+          totalWeighted += avgScore * data.weight;
+          totalWeight += data.weight;
+        }
+        
+        const totalScore = totalWeight > 0 ? totalWeighted / totalWeight : 0;
 
-    // Upsert evaluation (store both raw totals for accumulation AND calculated scores for display)
-    await adminClient.from("evaluations").upsert(
-      {
-        interview_id: interviewId,
-        scores: {
-          totalScore,
-          questionScores,
-          signals,
-          signalTotals, // Keep raw data for future accumulation
-        },
-      },
-      { onConflict: "interview_id" }
-    );
+        await adminClient.from("evaluations").upsert(
+          {
+            interview_id: interviewId,
+            scores: { totalScore, questionScores, signals, signalTotals },
+          },
+          { onConflict: "interview_id" }
+        );
+      } catch (e) {
+        console.error("Background evaluation update failed:", e);
+      }
+    })();
 
     const maxFollowups = state.config.policies?.max_followups_per_question ?? 1;
 
-    // Check if we need a follow-up (Task 11.1)
+    // Check for follow-up
     if (shouldFollowUp(evaluation, followupsUsed, maxFollowups)) {
       const followupPrompt = getFollowUpPrompt(
         currentQuestion,
@@ -147,12 +145,12 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Move to next question (Task 11.2)
+    // Move to next question
     const nextQuestion = getNextQuestion(state);
 
     if (!nextQuestion) {
-      // End interview after last question (Task 11.3)
-      await completeInterview(interviewId);
+      // OPTIMIZATION: Don't await completion - fire and forget
+      completeInterview(interviewId).catch(console.error);
 
       return NextResponse.json({
         action: "complete",
@@ -164,8 +162,8 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Advance to next question
-    await updateCurrentQuestion(interviewId, nextQuestion.id);
+    // OPTIMIZATION: Update current question in background (don't await)
+    updateCurrentQuestion(interviewId, nextQuestion.id).catch(console.error);
 
     return NextResponse.json({
       action: "next_question",
@@ -188,4 +186,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-

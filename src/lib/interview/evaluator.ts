@@ -7,7 +7,7 @@ const openai = new OpenAI({
   apiKey: env.OPENAI_API_KEY,
 });
 
-// Schema for evaluator output
+// Schema for evaluator output - simplified for faster parsing
 const evaluatorOutputSchema = z.object({
   score: z.number().min(0).max(1),
   reasoning: z.string(),
@@ -16,34 +16,6 @@ const evaluatorOutputSchema = z.object({
 });
 
 export type EvaluatorOutput = z.infer<typeof evaluatorOutputSchema>;
-
-// Signal descriptions for evaluation criteria
-const SIGNAL_CRITERIA: Record<string, string> = {
-  communication: `
-    - Clarity: Is the answer clear and well-structured?
-    - Articulation: Does the candidate express ideas effectively?
-    - Conciseness: Is the answer appropriately detailed without rambling?
-    - Professionalism: Is the tone and language professional?`,
-  experience: `
-    - Relevance: Does the experience relate to the question/role?
-    - Depth: Does the candidate show genuine hands-on experience?
-    - Impact: Did they describe concrete outcomes or achievements?
-    - Growth: Does their experience show progression?`,
-  motivation: `
-    - Enthusiasm: Does the candidate show genuine interest?
-    - Alignment: Do their goals align with the role/company?
-    - Research: Do they show understanding of the opportunity?
-    - Authenticity: Does their motivation seem genuine, not rehearsed?`,
-  technical: `
-    - Accuracy: Is the technical content correct?
-    - Depth: Do they show deep understanding vs surface knowledge?
-    - Problem-solving: Can they explain their approach to challenges?
-    - Best practices: Do they mention industry standards?`,
-  general: `
-    - Completeness: Did they fully address the question?
-    - Quality: Is the answer thoughtful and relevant?
-    - Specificity: Did they provide concrete examples?`,
-};
 
 // Resume analysis type for context
 export interface ResumeContext {
@@ -57,8 +29,17 @@ export interface ResumeContext {
   concerns?: string[];
 }
 
+// Compact signal descriptions
+const SIGNAL_HINTS: Record<string, string> = {
+  communication: "clarity, articulation, professionalism",
+  experience: "relevance, depth, concrete achievements",
+  motivation: "enthusiasm, alignment with role, authenticity",
+  technical: "accuracy, problem-solving, best practices",
+  general: "completeness, quality, specificity",
+};
+
 /**
- * Build evaluator prompt (Task 10.1)
+ * Build optimized evaluator prompt (~500 tokens vs ~2000 before)
  */
 export function buildEvaluatorPrompt(
   question: Question,
@@ -67,87 +48,42 @@ export function buildEvaluatorPrompt(
   resumeContext?: ResumeContext
 ): string {
   const signal = question.rubric?.signal || "general";
-  const criteria = SIGNAL_CRITERIA[signal] || SIGNAL_CRITERIA.general;
-  const roleContext = config.role_context;
-
-  const followupConditions = question.followups?.length
-    ? `\nFollow-up triggers: ${question.followups.map((f) => `"${f.condition}"`).join(", ")}`
-    : "";
-
-  // Build role context section
-  let roleSection = "";
-  if (roleContext) {
-    roleSection = `
-## Role Context
-- **Position:** ${roleContext.job_title}${roleContext.level ? ` (${roleContext.level})` : ""}
-${roleContext.department ? `- **Department:** ${roleContext.department}` : ""}
-${roleContext.required_skills?.length ? `- **Required Skills:** ${roleContext.required_skills.join(", ")}` : ""}
-${roleContext.preferred_experience ? `- **Expected Experience:** ${roleContext.preferred_experience}` : ""}
-${roleContext.company_context ? `- **Company Context:** ${roleContext.company_context}` : ""}
-${roleContext.evaluation_notes ? `- **Evaluation Notes:** ${roleContext.evaluation_notes}` : ""}
-
-Use this context to judge if the candidate's experience and answers are RELEVANT to this specific role.
-`;
+  const signalHint = SIGNAL_HINTS[signal] || SIGNAL_HINTS.general;
+  
+  // Build compact context (only essential info)
+  let context = "";
+  
+  if (config.role_context?.job_title) {
+    context += `Role: ${config.role_context.job_title}`;
+    if (config.role_context.required_skills?.length) {
+      context += ` | Skills needed: ${config.role_context.required_skills.slice(0, 5).join(", ")}`;
+    }
+    context += "\n";
+  }
+  
+  if (resumeContext?.summary) {
+    context += `Candidate: ${resumeContext.summary.slice(0, 150)}...\n`;
   }
 
-  // Build resume context section
-  let resumeSection = "";
-  if (resumeContext) {
-    resumeSection = `
-## Candidate Background (from resume)
-${resumeContext.summary ? `- **Summary:** ${resumeContext.summary}` : ""}
-${resumeContext.skills?.length ? `- **Skills:** ${resumeContext.skills.join(", ")}` : ""}
-${resumeContext.relevant_experience?.length ? `- **Relevant Experience:** ${resumeContext.relevant_experience.join("; ")}` : ""}
-${resumeContext.strengths?.length ? `- **Strengths:** ${resumeContext.strengths.join(", ")}` : ""}
-${resumeContext.concerns?.length ? `- **Concerns to Address:** ${resumeContext.concerns.join(", ")}` : ""}
+  // Check for follow-up triggers
+  const triggers = question.followups?.map(f => f.condition).join(", ") || "";
 
-Use this background to:
-1. Verify if their verbal answers align with their resume claims
-2. Give higher scores when they expand on resume experience with specific details
-3. Note any discrepancies between resume and verbal answers
-`;
-  }
+  return `Evaluate this interview answer. Score 0-1.
 
-  return `${config.system_prompt}
+${context}Q: "${question.prompt}"
+A: "${candidateAnswer}"
 
-You are evaluating a candidate's answer in an interview.
-${roleSection}${resumeSection}
-## Question
-"${question.prompt}"
+Signal: ${signal} (${signalHint})
+${triggers ? `Follow-up if: ${triggers}` : ""}
 
-## Candidate's Answer
-"${candidateAnswer}"
+Scoring: 0-0.3 poor, 0.4-0.6 average, 0.7-0.8 good, 0.9-1 excellent.
+Higher scores for specific examples and role relevance.
 
-## Evaluation Criteria (Signal: ${signal})
-${criteria}
-
-## Scoring Guide
-- 0.0-0.2: Poor - Answer is off-topic, incoherent, or shows red flags
-- 0.3-0.4: Below Average - Answer is vague, lacks substance, or not relevant to the role
-- 0.5-0.6: Average - Acceptable answer but nothing impressive
-- 0.7-0.8: Good - Solid answer with specific examples and clear relevance to the role
-- 0.9-1.0: Excellent - Outstanding answer that exceeds expectations and shows strong fit
-${followupConditions}
-
-## Instructions
-Evaluate the answer based on the criteria above AND the role context (if provided).
-- Consider whether the candidate's experience is RELEVANT to this specific position
-- A detailed, specific answer with concrete examples should score higher
-- Experience that directly relates to the required skills should score higher
-
-Respond with a JSON object:
-{
-  "score": <number 0-1>,
-  "reasoning": "<brief explanation of score, including relevance to role>",
-  "needsFollowup": <true if answer is vague/incomplete or matches a follow-up trigger>,
-  "followupReason": "<which trigger matched, if any>"
-}
-
-JSON response only:`;
+JSON only: {"score":0.X,"reasoning":"1 sentence","needsFollowup":bool,"followupReason":"optional"}`;
 }
 
 /**
- * Call LLM evaluator (Task 10.2)
+ * Call LLM evaluator with optimized settings
  */
 export async function evaluateAnswer(
   question: Question,
@@ -161,7 +97,8 @@ export async function evaluateAnswer(
     model: "gpt-4o-mini",
     messages: [{ role: "user", content: prompt }],
     response_format: { type: "json_object" },
-    temperature: 0.3,
+    temperature: 0.2, // Lower for faster, more deterministic responses
+    max_tokens: 150, // Limit output for speed
   });
 
   const content = response.choices[0]?.message?.content;
@@ -169,19 +106,23 @@ export async function evaluateAnswer(
     throw new Error("No response from evaluator");
   }
 
-  // Parse and validate output (Task 10.3)
   const parsed = JSON.parse(content);
   const result = evaluatorOutputSchema.safeParse(parsed);
 
   if (!result.success) {
-    throw new Error(`Invalid evaluator output: ${result.error.message}`);
+    // Fallback for malformed responses
+    return {
+      score: 0.5,
+      reasoning: "Evaluation parsing failed",
+      needsFollowup: false,
+    };
   }
 
   return result.data;
 }
 
 /**
- * Detect follow-up condition (Task 10.4)
+ * Detect follow-up condition
  */
 export function shouldFollowUp(
   evaluation: EvaluatorOutput,
@@ -218,4 +159,3 @@ export function getFollowUpPrompt(
   // Default to first followup
   return question.followups[0].prompt;
 }
-
