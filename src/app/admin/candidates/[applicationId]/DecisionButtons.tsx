@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { makeDecision } from "./actions";
+import { Button } from "@/components/ui/Button";
+import { CheckCircle, XCircle } from "lucide-react";
 
 interface Props {
   applicationId: string;
@@ -36,20 +38,26 @@ export function DecisionButtons({ applicationId }: Props) {
 
   return (
     <div className="flex gap-4">
-      <button
+      <Button
         onClick={() => handleDecision("accepted")}
         disabled={loading}
-        className="flex-1 px-6 py-3 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-500 transition-colors disabled:opacity-50"
+        variant="primary"
+        size="lg"
+        className="flex-1"
+        icon={<CheckCircle className="w-5 h-5" />}
       >
-        ✓ Accept Candidate
-      </button>
-      <button
+        Accept Candidate
+      </Button>
+      <Button
         onClick={() => handleDecision("rejected")}
         disabled={loading}
-        className="flex-1 px-6 py-3 bg-red-600 text-white rounded-lg font-medium hover:bg-red-500 transition-colors disabled:opacity-50"
+        variant="danger"
+        size="lg"
+        className="flex-1"
+        icon={<XCircle className="w-5 h-5" />}
       >
-        ✗ Reject Candidate
-      </button>
+        Reject Candidate
+      </Button>
     </div>
   );
 }

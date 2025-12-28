@@ -2,6 +2,10 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getCurrentOrg } from "@/lib/supabase/helpers";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { Card } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { Badge } from "@/components/ui/Badge";
+import { FileText, Plus, ArrowLeft, ChevronRight, Layers } from "lucide-react";
 
 export default async function TemplatesPage() {
   const org = await getCurrentOrg();
@@ -29,15 +33,22 @@ export default async function TemplatesPage() {
     .order("created_at", { ascending: false });
 
   return (
-    <div className="min-h-screen bg-zinc-900 text-white p-8">
+    <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 text-slate-100 p-8">
       <div className="max-w-6xl mx-auto">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold">Interview Templates</h1>
-          <Link
-            href="/admin/templates/new"
-            className="px-4 py-2 bg-emerald-600 rounded-lg hover:bg-emerald-500 transition-colors"
-          >
-            + Create Template
+        <div className="flex items-center gap-4 mb-8">
+          <Link href="/" className="text-slate-500 hover:text-slate-300 transition-colors">
+            <ArrowLeft className="w-5 h-5" />
+          </Link>
+          <div className="flex items-center gap-3 flex-1">
+            <div className="w-10 h-10 rounded-lg bg-blue-500/10 text-blue-500 flex items-center justify-center">
+              <FileText className="w-5 h-5" />
+            </div>
+            <h1 className="text-2xl font-bold">Interview Templates</h1>
+          </div>
+          <Link href="/admin/templates/new">
+            <Button variant="primary" icon={<Plus className="w-4 h-4" />}>
+              Create Template
+            </Button>
           </Link>
         </div>
 
@@ -50,47 +61,48 @@ export default async function TemplatesPage() {
               created_at: string;
             }>;
             const publishedVersion = versions?.find((v) => v.published_at !== null);
-            const latestVersion = versions?.[0];
 
             return (
-              <div
-                key={template.id}
-                className="bg-zinc-800 rounded-lg p-6 border border-zinc-700"
-              >
+              <Card key={template.id} hover>
                 <div className="flex justify-between items-start">
-                  <div>
-                    <h2 className="text-xl font-semibold">{template.name}</h2>
-                    <p className="text-zinc-400 text-sm mt-1">
-                      {versions?.length || 0} version(s)
-                      {publishedVersion && (
-                        <span className="ml-2 text-emerald-400">
-                          • v{publishedVersion.version} published
+                  <div className="flex items-start gap-4">
+                    <div className="w-10 h-10 rounded-lg bg-slate-700/50 text-slate-400 flex items-center justify-center">
+                      <Layers className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-semibold text-slate-100">{template.name}</h2>
+                      <div className="flex items-center gap-3 mt-1">
+                        <span className="text-sm text-slate-500">
+                          {versions?.length || 0} version(s)
                         </span>
-                      )}
-                    </p>
+                        {publishedVersion ? (
+                          <Badge variant="success">v{publishedVersion.version} published</Badge>
+                        ) : (
+                          <Badge variant="warning">Draft</Badge>
+                        )}
+                      </div>
+                    </div>
                   </div>
                   <Link
                     href={`/admin/templates/${template.id}/edit`}
-                    className="px-4 py-2 bg-zinc-700 rounded-lg hover:bg-zinc-600 transition-colors"
+                    className="inline-flex items-center gap-1 text-amber-500 hover:text-amber-400 text-sm font-medium transition-colors"
                   >
-                    Edit
+                    Edit <ChevronRight className="w-4 h-4" />
                   </Link>
                 </div>
-              </div>
+              </Card>
             );
           })}
 
           {(!templates || templates.length === 0) && (
-            <div className="text-center py-12 text-zinc-500">
-              <p>No templates yet. Create your first one!</p>
-            </div>
+            <Card>
+              <div className="text-center py-8 text-slate-500">
+                <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                <p>No templates yet</p>
+                <p className="text-sm mt-1">Create your first interview template</p>
+              </div>
+            </Card>
           )}
-        </div>
-
-        <div className="mt-8">
-          <Link href="/" className="text-zinc-400 hover:text-white">
-            ← Back to Home
-          </Link>
         </div>
       </div>
     </div>

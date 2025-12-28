@@ -2,6 +2,10 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getCurrentOrg } from "@/lib/supabase/helpers";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { Card } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { Badge } from "@/components/ui/Badge";
+import { Briefcase, Plus, ArrowLeft, ChevronRight, MapPin } from "lucide-react";
 
 export default async function JobsPage() {
   const supabase = await createSupabaseServerClient();
@@ -28,62 +32,72 @@ export default async function JobsPage() {
     .order("created_at", { ascending: false });
 
   return (
-    <div className="min-h-screen bg-zinc-900 text-white p-8">
+    <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 text-slate-100 p-8">
       <div className="max-w-6xl mx-auto">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold">Job Postings</h1>
-          <Link
-            href="/admin/jobs/new"
-            className="px-4 py-2 bg-emerald-600 rounded-lg hover:bg-emerald-500 transition-colors"
-          >
-            + Create Job
+        <div className="flex items-center gap-4 mb-8">
+          <Link href="/" className="text-slate-500 hover:text-slate-300 transition-colors">
+            <ArrowLeft className="w-5 h-5" />
+          </Link>
+          <div className="flex items-center gap-3 flex-1">
+            <div className="w-10 h-10 rounded-lg bg-amber-500/10 text-amber-500 flex items-center justify-center">
+              <Briefcase className="w-5 h-5" />
+            </div>
+            <h1 className="text-2xl font-bold">Job Postings</h1>
+          </div>
+          <Link href="/admin/jobs/new">
+            <Button variant="primary" icon={<Plus className="w-4 h-4" />}>
+              Create Job
+            </Button>
           </Link>
         </div>
 
-        <div className="bg-zinc-800 rounded-lg border border-zinc-700 overflow-hidden">
+        <Card padding="none" className="overflow-hidden">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-zinc-700">
-                <th className="text-left p-4 text-zinc-400 font-medium">Title</th>
-                <th className="text-left p-4 text-zinc-400 font-medium">Location</th>
-                <th className="text-left p-4 text-zinc-400 font-medium">Type</th>
-                <th className="text-left p-4 text-zinc-400 font-medium">Template</th>
-                <th className="text-left p-4 text-zinc-400 font-medium">Status</th>
-                <th className="text-right p-4 text-zinc-400 font-medium">Actions</th>
+              <tr className="border-b border-slate-700/50 bg-slate-800/30">
+                <th className="text-left p-4 text-slate-400 font-medium text-sm">Title</th>
+                <th className="text-left p-4 text-slate-400 font-medium text-sm">Location</th>
+                <th className="text-left p-4 text-slate-400 font-medium text-sm">Type</th>
+                <th className="text-left p-4 text-slate-400 font-medium text-sm">Template</th>
+                <th className="text-left p-4 text-slate-400 font-medium text-sm">Status</th>
+                <th className="text-right p-4 text-slate-400 font-medium text-sm"></th>
               </tr>
             </thead>
             <tbody>
               {jobs?.map((job) => (
-                <tr key={job.id} className="border-b border-zinc-700 last:border-0">
-                  <td className="p-4 font-medium">{job.title}</td>
-                  <td className="p-4 text-zinc-400">{job.location || "-"}</td>
-                  <td className="p-4 text-zinc-400 capitalize">
-                    {job.employment_type?.replace("_", "-") || "-"}
+                <tr key={job.id} className="border-b border-slate-800/50 last:border-0 hover:bg-slate-800/30 transition-colors">
+                  <td className="p-4 font-medium text-slate-200">{job.title}</td>
+                  <td className="p-4 text-slate-400">
+                    {job.location ? (
+                      <span className="flex items-center gap-1">
+                        <MapPin className="w-3 h-3" />
+                        {job.location}
+                      </span>
+                    ) : "-"}
                   </td>
-                  <td className="p-4 text-zinc-400">
+                  <td className="p-4 text-slate-400 capitalize">
+                    {job.employment_type?.replace("_", " ") || "-"}
+                  </td>
+                  <td className="p-4 text-slate-400">
                     {(job.interview_templates as unknown as { name: string } | null)?.name || "-"}
                   </td>
                   <td className="p-4">
-                    <span
-                      className={`px-2 py-1 rounded text-xs font-medium ${
-                        job.status === "active"
-                          ? "bg-emerald-900 text-emerald-300"
-                          : job.status === "paused"
-                          ? "bg-yellow-900 text-yellow-300"
-                          : job.status === "closed"
-                          ? "bg-red-900 text-red-300"
-                          : "bg-zinc-700 text-zinc-300"
-                      }`}
+                    <Badge
+                      variant={
+                        job.status === "active" ? "success" :
+                        job.status === "paused" ? "warning" :
+                        job.status === "closed" ? "error" : "default"
+                      }
                     >
                       {job.status}
-                    </span>
+                    </Badge>
                   </td>
                   <td className="p-4 text-right">
                     <Link
                       href={`/admin/jobs/${job.id}`}
-                      className="text-emerald-400 hover:text-emerald-300"
+                      className="inline-flex items-center gap-1 text-amber-500 hover:text-amber-400 text-sm font-medium transition-colors"
                     >
-                      Edit
+                      Edit <ChevronRight className="w-4 h-4" />
                     </Link>
                   </td>
                 </tr>
@@ -92,17 +106,13 @@ export default async function JobsPage() {
           </table>
 
           {(!jobs || jobs.length === 0) && (
-            <div className="text-center py-12 text-zinc-500">
-              <p>No job postings yet. Create your first one!</p>
+            <div className="text-center py-16 text-slate-500">
+              <Briefcase className="w-12 h-12 mx-auto mb-4 opacity-50" />
+              <p>No job postings yet</p>
+              <p className="text-sm mt-1">Create your first job to start hiring</p>
             </div>
           )}
-        </div>
-
-        <div className="mt-8">
-          <Link href="/" className="text-zinc-400 hover:text-white">
-            ← Back to Home
-          </Link>
-        </div>
+        </Card>
       </div>
     </div>
   );

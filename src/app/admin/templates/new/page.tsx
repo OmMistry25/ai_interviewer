@@ -4,6 +4,10 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createTemplate } from "../actions";
 import Link from "next/link";
+import { Card } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { ArrowLeft, FileText, AlertCircle } from "lucide-react";
 
 export default function NewTemplatePage() {
   const router = useRouter();
@@ -28,47 +32,49 @@ export default function NewTemplatePage() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-900 text-white p-8">
+    <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 text-slate-100 p-8">
       <div className="max-w-xl mx-auto">
-        <h1 className="text-3xl font-bold mb-8">Create Template</h1>
-
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {error && (
-            <div className="p-4 bg-red-900/50 border border-red-700 rounded-lg text-red-300">
-              {error}
+        <div className="flex items-center gap-4 mb-8">
+          <Link href="/admin/templates" className="text-slate-500 hover:text-slate-300 transition-colors">
+            <ArrowLeft className="w-5 h-5" />
+          </Link>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-blue-500/10 text-blue-500 flex items-center justify-center">
+              <FileText className="w-5 h-5" />
             </div>
-          )}
+            <h1 className="text-2xl font-bold">Create Template</h1>
+          </div>
+        </div>
 
-          <div>
-            <label className="block text-sm font-medium text-zinc-300 mb-2">
-              Template Name
-            </label>
-            <input
+        <Card>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {error && (
+              <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 flex items-center gap-2">
+                <AlertCircle className="w-4 h-4" />
+                {error}
+              </div>
+            )}
+
+            <Input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
+              label="Template Name"
               required
-              className="w-full px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
               placeholder="e.g., Barista Interview"
             />
-          </div>
 
-          <button
-            type="submit"
-            disabled={loading || !name.trim()}
-            className="w-full px-6 py-3 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-500 transition-colors disabled:opacity-50"
-          >
-            {loading ? "Creating..." : "Create Template"}
-          </button>
-        </form>
-
-        <div className="mt-8">
-          <Link href="/admin/templates" className="text-zinc-400 hover:text-white">
-            ← Back to Templates
-          </Link>
-        </div>
+            <Button
+              type="submit"
+              disabled={loading || !name.trim()}
+              variant="primary"
+              className="w-full"
+            >
+              {loading ? "Creating..." : "Create Template"}
+            </Button>
+          </form>
+        </Card>
       </div>
     </div>
   );
 }
-

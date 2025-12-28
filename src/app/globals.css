@@ -1,26 +1,72 @@
 @import "tailwindcss";
 
+/* Plus Jakarta Sans - Warm, friendly, modern */
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Warm dark palette */
+  --background: #0c1220;
+  --background-subtle: #111827;
+  --foreground: #f1f5f9;
+  --foreground-muted: #94a3b8;
+  
+  /* Warm accent - amber tones */
+  --accent: #f59e0b;
+  --accent-muted: #d97706;
+  --accent-subtle: rgba(245, 158, 11, 0.15);
+  
+  /* Warm success - softer green */
+  --success: #10b981;
+  --success-subtle: rgba(16, 185, 129, 0.15);
+  
+  /* Softer error */
+  --error: #f87171;
+  --error-subtle: rgba(248, 113, 113, 0.15);
+  
+  /* Card/surface colors */
+  --card: rgba(30, 41, 59, 0.5);
+  --card-border: rgba(71, 85, 105, 0.4);
+  --card-hover: rgba(30, 41, 59, 0.7);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --font-sans: 'Plus Jakarta Sans', system-ui, sans-serif;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Better focus styles */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Custom scrollbar for dark mode */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--background-subtle);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--card-border);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--foreground-muted);
 }

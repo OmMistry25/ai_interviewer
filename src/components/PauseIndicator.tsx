@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Send } from "lucide-react";
 
 interface PauseIndicatorProps {
   /** Whether pause detection is active */
@@ -24,25 +25,26 @@ export function PauseIndicator({
   }
 
   return (
-    <div className="flex items-center gap-2">
-      <span className="text-xs text-zinc-500">Detecting pause</span>
+    <div className="flex items-center gap-3 bg-slate-800/60 px-3 py-2 rounded-full border border-slate-700/50">
+      <span className="text-xs text-slate-500">Processing response</span>
       <div className="flex gap-1">
         {Array.from({ length: dots }).map((_, i) => (
           <div
             key={i}
             className={`
-              w-2 h-2 rounded-full transition-all duration-200
+              w-1.5 h-1.5 rounded-full transition-all duration-200
               ${i < filledDots 
-                ? "bg-amber-400 scale-110" 
-                : "bg-zinc-700"
+                ? "bg-amber-400 scale-125" 
+                : "bg-slate-600"
               }
             `}
           />
         ))}
       </div>
       {progress >= 0.8 && (
-        <span className="text-xs text-amber-400 animate-pulse">
-          Submitting soon...
+        <span className="flex items-center gap-1 text-xs text-amber-400 animate-pulse">
+          <Send className="w-3 h-3" />
+          Sending
         </span>
       )}
     </div>
@@ -84,4 +86,3 @@ export function usePauseProgress(
 
   return progress;
 }
-

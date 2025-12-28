@@ -3,6 +3,9 @@ import { getCurrentOrg } from "@/lib/supabase/helpers";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { CreateInterviewForm } from "./CreateInterviewForm";
+import { Card, CardHeader } from "@/components/ui/Card";
+import { Badge } from "@/components/ui/Badge";
+import { Video, ArrowLeft, ChevronRight, User, Mail } from "lucide-react";
 
 export default async function InterviewsPage() {
   const supabase = await createSupabaseServerClient();
@@ -46,13 +49,23 @@ export default async function InterviewsPage() {
     .limit(20);
 
   return (
-    <div className="min-h-screen bg-zinc-900 text-white p-8">
+    <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 text-slate-100 p-8">
       <div className="max-w-6xl mx-auto">
-        <h1 className="text-3xl font-bold mb-8">Interviews</h1>
+        <div className="flex items-center gap-4 mb-8">
+          <Link href="/" className="text-slate-500 hover:text-slate-300 transition-colors">
+            <ArrowLeft className="w-5 h-5" />
+          </Link>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-purple-500/10 text-purple-500 flex items-center justify-center">
+              <Video className="w-5 h-5" />
+            </div>
+            <h1 className="text-2xl font-bold">Interviews</h1>
+          </div>
+        </div>
 
         {/* Create Interview Form */}
-        <div className="bg-zinc-800 rounded-lg p-6 border border-zinc-700 mb-8">
-          <h2 className="text-xl font-semibold mb-4">Create New Interview</h2>
+        <Card className="mb-8">
+          <CardHeader title="Create New Interview" description="Send a direct interview link to a candidate" />
           <CreateInterviewForm
             templates={
               templates?.map((t) => ({
@@ -61,11 +74,11 @@ export default async function InterviewsPage() {
               })) || []
             }
           />
-        </div>
+        </Card>
 
         {/* Interview List */}
         <div className="space-y-4">
-          <h2 className="text-xl font-semibold">Recent Interviews</h2>
+          <h2 className="text-lg font-semibold text-slate-300">Recent Interviews</h2>
 
           {interviews?.map((interview) => {
             const templateVersions = interview.interview_template_versions as unknown as {
@@ -74,50 +87,51 @@ export default async function InterviewsPage() {
             const templateName = templateVersions?.interview_templates?.name || "Unknown";
 
             return (
-              <div
-                key={interview.id}
-                className="bg-zinc-800 rounded-lg p-4 border border-zinc-700 flex justify-between items-center"
-              >
-                <div>
-                  <p className="font-medium">{interview.candidate_name}</p>
-                  <p className="text-sm text-zinc-400">
-                    {interview.candidate_email} • {templateName}
-                  </p>
+              <Card key={interview.id} hover>
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-full bg-slate-700/50 text-slate-400 flex items-center justify-center">
+                      <User className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-slate-200">{interview.candidate_name}</p>
+                      <div className="flex items-center gap-2 text-sm text-slate-500">
+                        <Mail className="w-3 h-3" />
+                        {interview.candidate_email}
+                        <span className="text-slate-600">•</span>
+                        {templateName}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <Badge
+                      variant={
+                        interview.status === "completed" ? "success" :
+                        interview.status === "live" ? "warning" : "default"
+                      }
+                    >
+                      {interview.status}
+                    </Badge>
+                    <Link
+                      href={`/admin/interviews/${interview.id}`}
+                      className="inline-flex items-center gap-1 text-amber-500 hover:text-amber-400 text-sm font-medium transition-colors"
+                    >
+                      View <ChevronRight className="w-4 h-4" />
+                    </Link>
+                  </div>
                 </div>
-                <div className="flex items-center gap-4">
-                  <span
-                    className={`px-2 py-1 rounded text-xs font-medium ${
-                      interview.status === "completed"
-                        ? "bg-emerald-900 text-emerald-300"
-                        : interview.status === "live"
-                        ? "bg-yellow-900 text-yellow-300"
-                        : "bg-zinc-700 text-zinc-300"
-                    }`}
-                  >
-                    {interview.status}
-                  </span>
-                  <Link
-                    href={`/admin/interviews/${interview.id}`}
-                    className="text-emerald-400 hover:text-emerald-300"
-                  >
-                    View →
-                  </Link>
-                </div>
-              </div>
+              </Card>
             );
           })}
 
           {(!interviews || interviews.length === 0) && (
-            <div className="text-center py-8 text-zinc-500">
-              <p>No interviews yet.</p>
-            </div>
+            <Card>
+              <div className="text-center py-8 text-slate-500">
+                <Video className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                <p>No interviews yet</p>
+              </div>
+            </Card>
           )}
-        </div>
-
-        <div className="mt-8">
-          <Link href="/" className="text-zinc-400 hover:text-white">
-            ← Back to Home
-          </Link>
         </div>
       </div>
     </div>

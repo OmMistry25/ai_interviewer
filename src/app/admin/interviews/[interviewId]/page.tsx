@@ -2,6 +2,9 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getCurrentOrg } from "@/lib/supabase/helpers";
 import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
+import { Card, CardHeader } from "@/components/ui/Card";
+import { Badge } from "@/components/ui/Badge";
+import { ArrowLeft, Video, Link as LinkIcon, MessageSquare, BarChart3, Brain, Copy } from "lucide-react";
 
 interface Props {
   params: Promise<{ interviewId: string }>;
@@ -35,113 +38,131 @@ export default async function InterviewDetailPage({ params }: Props) {
     notFound();
   }
 
-  const templateVersions = interview.interview_template_versions as unknown as {
-    config: Record<string, unknown>;
-    interview_templates: { name: string } | null;
-  } | null;
-
   const interviewUrl = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/candidate/interview/${interview.access_token}`;
 
-  return (
-    <div className="min-h-screen bg-zinc-900 text-white p-8">
-      <div className="max-w-4xl mx-auto">
-        <div className="mb-8">
-          <Link href="/admin/interviews" className="text-zinc-400 hover:text-white text-sm">
-            ← Back to Interviews
-          </Link>
-        </div>
+  // Extract signal scores if available
+  const scores = interview.scores as {
+    totalScore?: number;
+    signals?: Record<string, { score: number }>;
+  } | null;
+  
+  const signalScores = scores?.signals
+    ? Object.entries(scores.signals).map(([name, data]) => ({
+        name,
+        score: data.score,
+      }))
+    : [];
 
-        <div className="flex justify-between items-start mb-8">
-          <div>
-            <h1 className="text-3xl font-bold">{interview.candidate_name}</h1>
-            <p className="text-zinc-400">{interview.candidate_email}</p>
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 text-slate-100 p-8">
+      <div className="max-w-4xl mx-auto">
+        <div className="flex items-center gap-4 mb-8">
+          <Link href="/admin/interviews" className="text-slate-500 hover:text-slate-300 transition-colors">
+            <ArrowLeft className="w-5 h-5" />
+          </Link>
+          <div className="flex items-center gap-3 flex-1">
+            <div className="w-10 h-10 rounded-lg bg-purple-500/10 text-purple-500 flex items-center justify-center">
+              <Video className="w-5 h-5" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold">{interview.candidate_name}</h1>
+              <p className="text-slate-500 text-sm">{interview.candidate_email}</p>
+            </div>
           </div>
-          <span
-            className={`px-3 py-1 rounded-full text-sm font-medium ${
-              interview.status === "completed"
-                ? "bg-emerald-900 text-emerald-300"
-                : interview.status === "live"
-                ? "bg-yellow-900 text-yellow-300"
-                : "bg-zinc-700 text-zinc-300"
-            }`}
+          <Badge
+            variant={
+              interview.status === "completed" ? "success" :
+              interview.status === "live" ? "warning" : "default"
+            }
           >
             {interview.status}
-          </span>
+          </Badge>
         </div>
 
         {/* Interview Link */}
         {interview.status === "scheduled" && (
-          <div className="bg-zinc-800 rounded-lg p-6 border border-zinc-700 mb-6">
-            <h2 className="text-lg font-semibold mb-2">Interview Link</h2>
-            <p className="text-zinc-400 text-sm mb-3">Share this link with the candidate:</p>
+          <Card className="mb-6">
+            <CardHeader title="Interview Link" icon={<LinkIcon className="w-5 h-5" />} />
+            <p className="text-slate-400 text-sm mb-3">Share this link with the candidate:</p>
             <div className="flex gap-2">
               <input
                 type="text"
                 value={interviewUrl}
                 readOnly
-                className="flex-1 px-3 py-2 bg-zinc-900 border border-zinc-600 rounded text-sm font-mono"
+                className="flex-1 px-3 py-2 bg-slate-900/50 border border-slate-700/50 rounded-lg text-sm font-mono text-slate-300"
               />
               <button
                 onClick={() => navigator.clipboard.writeText(interviewUrl)}
-                className="px-3 py-2 bg-zinc-700 rounded hover:bg-zinc-600 text-sm"
+                className="px-3 py-2 bg-slate-700/60 border border-slate-600/50 rounded-lg hover:bg-slate-700 text-sm flex items-center gap-2 transition-colors"
               >
+                <Copy className="w-4 h-4" />
                 Copy
               </button>
             </div>
-          </div>
+          </Card>
+        )}
+
+        {/* Scores */}
+        {signalScores.length > 0 && (
+          <Card className="mb-6">
+            <CardHeader title="Evaluation Scores" icon={<BarChart3 className="w-5 h-5" />} />
+            
+            {scores?.totalScore !== undefined && (
+              <div className="text-center p-6 bg-gradient-to-br from-amber-500/10 to-transparent rounded-xl border border-amber-500/20 mb-5">
+                <p className="text-4xl font-bold text-amber-400">
+                  {Math.round(scores.totalScore * 100)}%
+                </p>
+                <p className="text-sm text-slate-500 mt-1">Overall Score</p>
+              </div>
+            )}
+            
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              {signalScores.map(({ name, score }) => (
+                <div key={name} className="text-center p-4 bg-slate-800/50 rounded-lg border border-slate-700/40">
+                  <p className="text-2xl font-bold text-slate-100">
+                    {Math.round(score * 100)}%
+                  </p>
+                  <p className="text-xs text-slate-500 capitalize mt-1">{name.replace(/_/g, " ")}</p>
+                </div>
+              ))}
+            </div>
+          </Card>
         )}
 
         {/* Transcript */}
         {interview.transcript && (
-          <div className="bg-zinc-800 rounded-lg p-6 border border-zinc-700 mb-6">
-            <h2 className="text-lg font-semibold mb-4">Transcript</h2>
-            <div className="space-y-4">
+          <Card className="mb-6">
+            <CardHeader title="Transcript" icon={<MessageSquare className="w-5 h-5" />} />
+            <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
               {(interview.transcript as Array<{ role: string; content: string }>).map(
                 (msg, i) => (
                   <div
                     key={i}
-                    className={`p-3 rounded-lg ${
+                    className={`p-4 rounded-lg ${
                       msg.role === "assistant"
-                        ? "bg-zinc-700"
-                        : "bg-emerald-900/30"
+                        ? "bg-slate-800/50 border border-slate-700/40"
+                        : "bg-amber-500/10 border border-amber-500/20 ml-4"
                     }`}
                   >
-                    <p className="text-xs text-zinc-400 mb-1">
+                    <p className={`text-xs font-medium mb-1 ${
+                      msg.role === "assistant" ? "text-slate-500" : "text-amber-500"
+                    }`}>
                       {msg.role === "assistant" ? "Interviewer" : "Candidate"}
                     </p>
-                    <p>{msg.content}</p>
+                    <p className="text-sm text-slate-300 leading-relaxed">{msg.content}</p>
                   </div>
                 )
               )}
             </div>
-          </div>
-        )}
-
-        {/* Scores */}
-        {interview.scores && (
-          <div className="bg-zinc-800 rounded-lg p-6 border border-zinc-700 mb-6">
-            <h2 className="text-lg font-semibold mb-4">Evaluation Scores</h2>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {Object.entries(interview.scores as Record<string, number>).map(
-                ([signal, score]) => (
-                  <div key={signal} className="text-center p-4 bg-zinc-700 rounded-lg">
-                    <p className="text-2xl font-bold text-emerald-400">
-                      {Math.round(score * 100)}%
-                    </p>
-                    <p className="text-sm text-zinc-400 capitalize">{signal}</p>
-                  </div>
-                )
-              )}
-            </div>
-          </div>
+          </Card>
         )}
 
         {/* Summary */}
         {interview.summary && (
-          <div className="bg-zinc-800 rounded-lg p-6 border border-zinc-700">
-            <h2 className="text-lg font-semibold mb-4">AI Summary</h2>
-            <p className="text-zinc-300 whitespace-pre-wrap">{interview.summary}</p>
-          </div>
+          <Card>
+            <CardHeader title="AI Summary" icon={<Brain className="w-5 h-5" />} />
+            <p className="text-slate-400 whitespace-pre-wrap leading-relaxed">{interview.summary}</p>
+          </Card>
         )}
       </div>
     </div>

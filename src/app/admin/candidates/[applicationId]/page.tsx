@@ -3,6 +3,9 @@ import { getCurrentOrg } from "@/lib/supabase/helpers";
 import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
 import { DecisionButtons } from "./DecisionButtons";
+import { Card, CardHeader } from "@/components/ui/Card";
+import { StatusBadge, Badge } from "@/components/ui/Badge";
+import { ArrowLeft, FileText, BarChart3, MessageSquare, Brain, CheckCircle, AlertTriangle, GraduationCap, Star } from "lucide-react";
 
 interface Props {
   params: Promise<{ applicationId: string }>;
@@ -80,6 +83,7 @@ export default async function CandidateDetailPage({ params }: Props) {
       }))
     : [];
   const totalScore = interview?.scores?.totalScore;
+
   const resumeAnalysis = application.resume_analysis as unknown as {
     summary?: string;
     skills?: string[];
@@ -92,104 +96,96 @@ export default async function CandidateDetailPage({ params }: Props) {
   } | null;
 
   return (
-    <div className="min-h-screen bg-zinc-900 text-white p-8">
+    <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 text-slate-100 p-8">
       <div className="max-w-4xl mx-auto">
         <div className="mb-8">
-          <Link href="/admin/candidates" className="text-zinc-400 hover:text-white text-sm">
-            ← Back to Candidates
+          <Link href="/admin/candidates" className="inline-flex items-center gap-2 text-slate-500 hover:text-slate-300 text-sm transition-colors">
+            <ArrowLeft className="w-4 h-4" />
+            Back to Candidates
           </Link>
         </div>
 
         {/* Header */}
         <div className="flex justify-between items-start mb-8">
           <div>
-            <h1 className="text-3xl font-bold">
+            <h1 className="text-3xl font-bold text-slate-100">
               {candidate?.first_name} {candidate?.last_name}
             </h1>
-            <p className="text-zinc-400">{candidate?.email}</p>
+            <p className="text-slate-400 mt-1">{candidate?.email}</p>
             {candidate?.phone && (
-              <p className="text-zinc-400">{candidate.phone}</p>
+              <p className="text-slate-500 text-sm">{candidate.phone}</p>
             )}
-            <p className="text-sm text-zinc-500 mt-1">
-              Applied for: {job?.title} •{" "}
-              {new Date(application.created_at).toLocaleDateString()}
+            <p className="text-sm text-slate-600 mt-2">
+              Applied for <span className="text-slate-400">{job?.title}</span> • {new Date(application.created_at).toLocaleDateString()}
             </p>
           </div>
-          <span
-            className={`px-3 py-1 rounded-full text-sm font-medium ${
-              application.status === "accepted"
-                ? "bg-emerald-900 text-emerald-300"
-                : application.status === "rejected"
-                ? "bg-red-900 text-red-300"
-                : application.status === "interviewed"
-                ? "bg-yellow-900 text-yellow-300"
-                : "bg-blue-900 text-blue-300"
-            }`}
-          >
-            {application.status}
-          </span>
+          <StatusBadge status={application.status} />
         </div>
 
         {/* Decision Buttons */}
         {application.status === "interviewed" && (
-          <div className="mb-8">
+          <Card className="mb-6">
             <DecisionButtons applicationId={application.id} />
-          </div>
+          </Card>
         )}
 
         {/* Resume Analysis */}
         {resumeAnalysis && (
-          <div className="bg-zinc-800 rounded-lg p-6 border border-zinc-700 mb-6">
-            <h2 className="text-lg font-semibold mb-4">📄 Resume Analysis</h2>
+          <Card className="mb-6">
+            <CardHeader title="Resume Analysis" icon={<FileText className="w-5 h-5" />} />
             
             {resumeAnalysis.summary && (
-              <p className="text-zinc-300 mb-4">{resumeAnalysis.summary}</p>
+              <p className="text-slate-400 mb-5 leading-relaxed">{resumeAnalysis.summary}</p>
             )}
 
-            <div className="grid grid-cols-2 gap-4 mb-4">
+            <div className="grid grid-cols-2 gap-4 mb-5">
               {resumeAnalysis.years_of_experience !== undefined && resumeAnalysis.years_of_experience !== null && (
-                <div className="bg-zinc-700 rounded-lg p-3">
-                  <p className="text-xs text-zinc-400">Experience</p>
-                  <p className="text-lg font-semibold">{resumeAnalysis.years_of_experience} years</p>
+                <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700/40">
+                  <p className="text-xs text-slate-500 mb-1">Experience</p>
+                  <p className="text-lg font-semibold text-slate-200">{resumeAnalysis.years_of_experience} years</p>
                 </div>
               )}
               {resumeAnalysis.fit_score !== undefined && (
-                <div className="bg-zinc-700 rounded-lg p-3">
-                  <p className="text-xs text-zinc-400">Fit Score</p>
-                  <p className="text-lg font-semibold">{resumeAnalysis.fit_score}/10</p>
+                <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700/40">
+                  <p className="text-xs text-slate-500 mb-1">Fit Score</p>
+                  <p className="text-lg font-semibold text-amber-400">{resumeAnalysis.fit_score}/10</p>
                 </div>
               )}
             </div>
 
             {resumeAnalysis.education && resumeAnalysis.education.length > 0 && (
-              <div className="bg-zinc-700 rounded-lg p-3 mb-4">
-                <p className="text-xs text-zinc-400">Education</p>
-                <p className="text-sm">{resumeAnalysis.education.join(", ")}</p>
+              <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700/40 mb-5">
+                <div className="flex items-center gap-2 text-xs text-slate-500 mb-2">
+                  <GraduationCap className="w-4 h-4" />
+                  Education
+                </div>
+                <p className="text-sm text-slate-300">{resumeAnalysis.education.join(", ")}</p>
               </div>
             )}
 
             {resumeAnalysis.skills && resumeAnalysis.skills.length > 0 && (
-              <div className="mb-4">
-                <p className="text-xs text-zinc-400 mb-2">Skills</p>
+              <div className="mb-5">
+                <p className="text-xs text-slate-500 mb-2">Skills</p>
                 <div className="flex flex-wrap gap-2">
                   {resumeAnalysis.skills.map((skill, i) => (
-                    <span
-                      key={i}
-                      className="px-2 py-1 bg-emerald-900/50 text-emerald-300 rounded text-sm"
-                    >
-                      {skill}
-                    </span>
+                    <Badge key={i} variant="success">{skill}</Badge>
                   ))}
                 </div>
               </div>
             )}
 
             {resumeAnalysis.strengths && resumeAnalysis.strengths.length > 0 && (
-              <div className="mb-4">
-                <p className="text-xs text-zinc-400 mb-2">✓ Strengths</p>
-                <ul className="list-disc list-inside text-sm text-zinc-300 space-y-1">
+              <div className="mb-5">
+                <div className="flex items-center gap-2 text-xs text-slate-500 mb-2">
+                  <CheckCircle className="w-4 h-4 text-emerald-500" />
+                  Strengths
+                </div>
+                <ul className="space-y-2">
                   {resumeAnalysis.strengths.map((s, i) => (
-                    <li key={i}>{s}</li>
+                    <li key={i} className="text-sm text-slate-400 flex items-start gap-2">
+                      <span className="text-emerald-500 mt-1">•</span>
+                      {s}
+                    </li>
                   ))}
                 </ul>
               </div>
@@ -197,76 +193,84 @@ export default async function CandidateDetailPage({ params }: Props) {
 
             {resumeAnalysis.concerns && resumeAnalysis.concerns.length > 0 && (
               <div>
-                <p className="text-xs text-zinc-400 mb-2">⚠ Concerns</p>
-                <ul className="list-disc list-inside text-sm text-yellow-300 space-y-1">
+                <div className="flex items-center gap-2 text-xs text-slate-500 mb-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-500" />
+                  Areas to Explore
+                </div>
+                <ul className="space-y-2">
                   {resumeAnalysis.concerns.map((c, i) => (
-                    <li key={i}>{c}</li>
+                    <li key={i} className="text-sm text-slate-400 flex items-start gap-2">
+                      <span className="text-amber-500 mt-1">•</span>
+                      {c}
+                    </li>
                   ))}
                 </ul>
               </div>
             )}
-          </div>
+          </Card>
         )}
 
         {/* Interview Scores */}
         {signalScores.length > 0 && (
-          <div className="bg-zinc-800 rounded-lg p-6 border border-zinc-700 mb-6">
-            <h2 className="text-lg font-semibold mb-4">📊 Interview Scores</h2>
+          <Card className="mb-6">
+            <CardHeader title="Interview Scores" icon={<BarChart3 className="w-5 h-5" />} />
             
             {/* Overall Score */}
             {totalScore !== undefined && (
-              <div className="text-center p-4 bg-zinc-700 rounded-lg mb-4">
-                <p className="text-3xl font-bold text-emerald-400">
+              <div className="text-center p-6 bg-gradient-to-br from-amber-500/10 to-transparent rounded-xl border border-amber-500/20 mb-5">
+                <p className="text-4xl font-bold text-amber-400">
                   {Math.round(totalScore * 100)}%
                 </p>
-                <p className="text-sm text-zinc-400">Overall Score</p>
+                <p className="text-sm text-slate-500 mt-1">Overall Score</p>
               </div>
             )}
 
             {/* Signal Breakdown */}
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
               {signalScores.map(({ name, score }) => (
-                <div key={name} className="text-center p-4 bg-zinc-700 rounded-lg">
-                  <p className="text-2xl font-bold text-emerald-400">
+                <div key={name} className="text-center p-4 bg-slate-800/50 rounded-lg border border-slate-700/40">
+                  <p className="text-2xl font-bold text-slate-100">
                     {Math.round(score * 100)}%
                   </p>
-                  <p className="text-sm text-zinc-400 capitalize">{name.replace(/_/g, " ")}</p>
+                  <p className="text-xs text-slate-500 capitalize mt-1">{name.replace(/_/g, " ")}</p>
                 </div>
               ))}
             </div>
-          </div>
+          </Card>
         )}
 
         {/* Interview Summary */}
         {interview?.summary && (
-          <div className="bg-zinc-800 rounded-lg p-6 border border-zinc-700 mb-6">
-            <h2 className="text-lg font-semibold mb-4">🤖 AI Summary</h2>
-            <p className="text-zinc-300 whitespace-pre-wrap">{interview.summary}</p>
-          </div>
+          <Card className="mb-6">
+            <CardHeader title="AI Summary" icon={<Brain className="w-5 h-5" />} />
+            <p className="text-slate-400 whitespace-pre-wrap leading-relaxed">{interview.summary}</p>
+          </Card>
         )}
 
         {/* Transcript */}
         {interview?.transcript && (
-          <div className="bg-zinc-800 rounded-lg p-6 border border-zinc-700">
-            <h2 className="text-lg font-semibold mb-4">💬 Interview Transcript</h2>
-            <div className="space-y-4 max-h-[500px] overflow-y-auto">
+          <Card>
+            <CardHeader title="Interview Transcript" icon={<MessageSquare className="w-5 h-5" />} />
+            <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
               {interview.transcript.map((msg, i) => (
                 <div
                   key={i}
-                  className={`p-3 rounded-lg ${
+                  className={`p-4 rounded-lg ${
                     msg.role === "assistant"
-                      ? "bg-zinc-700"
-                      : "bg-emerald-900/30"
+                      ? "bg-slate-800/50 border border-slate-700/40"
+                      : "bg-amber-500/10 border border-amber-500/20 ml-4"
                   }`}
                 >
-                  <p className="text-xs text-zinc-400 mb-1">
+                  <p className={`text-xs font-medium mb-1 ${
+                    msg.role === "assistant" ? "text-slate-500" : "text-amber-500"
+                  }`}>
                     {msg.role === "assistant" ? "Interviewer" : "Candidate"}
                   </p>
-                  <p className="text-sm">{msg.content}</p>
+                  <p className="text-sm text-slate-300 leading-relaxed">{msg.content}</p>
                 </div>
               ))}
             </div>
-          </div>
+          </Card>
         )}
       </div>
     </div>

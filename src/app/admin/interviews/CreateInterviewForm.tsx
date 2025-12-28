@@ -2,6 +2,9 @@
 
 import { useState } from "react";
 import { createInterview } from "./actions";
+import { Button } from "@/components/ui/Button";
+import { Input, Select } from "@/components/ui/Input";
+import { CheckCircle, Copy, AlertCircle } from "lucide-react";
 
 interface Props {
   templates: { id: string; name: string }[];
@@ -14,6 +17,7 @@ export function CreateInterviewForm({ templates }: Props) {
     error?: string;
   } | null>(null);
   const [loading, setLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   async function handleSubmit(formData: FormData) {
     setLoading(true);
@@ -28,94 +32,91 @@ export function CreateInterviewForm({ templates }: Props) {
     ? `${window.location.origin}/candidate/interview/${result.token}`
     : null;
 
+  function handleCopy() {
+    if (interviewUrl) {
+      navigator.clipboard.writeText(interviewUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  }
+
   return (
-    <form action={handleSubmit} className="space-y-4">
+    <form action={handleSubmit} className="space-y-5">
       {result?.error && (
-        <div className="p-3 bg-red-900/50 border border-red-700 rounded-lg text-red-300 text-sm">
+        <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm flex items-center gap-2">
+          <AlertCircle className="w-4 h-4" />
           {result.error}
         </div>
       )}
 
       {interviewUrl && (
-        <div className="p-4 bg-emerald-900/50 border border-emerald-700 rounded-lg">
-          <p className="text-emerald-300 text-sm mb-2">Interview created! Send this link to the candidate:</p>
+        <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
+          <div className="flex items-center gap-2 text-emerald-400 text-sm mb-3">
+            <CheckCircle className="w-4 h-4" />
+            Interview created! Send this link to the candidate:
+          </div>
           <div className="flex gap-2">
             <input
               type="text"
               value={interviewUrl}
               readOnly
-              className="flex-1 px-3 py-2 bg-zinc-900 border border-zinc-600 rounded text-sm font-mono"
+              className="flex-1 px-3 py-2 bg-slate-900/50 border border-slate-700/50 rounded-lg text-sm font-mono text-slate-300"
             />
-            <button
+            <Button
               type="button"
-              onClick={() => navigator.clipboard.writeText(interviewUrl)}
-              className="px-3 py-2 bg-zinc-700 rounded hover:bg-zinc-600 text-sm"
+              variant="secondary"
+              onClick={handleCopy}
+              icon={<Copy className="w-4 h-4" />}
             >
-              Copy
-            </button>
+              {copied ? "Copied!" : "Copy"}
+            </Button>
           </div>
         </div>
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-zinc-300 mb-1">
-            Template
-          </label>
-          <select
-            name="templateId"
-            required
-            className="w-full px-3 py-2 bg-zinc-700 border border-zinc-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-          >
-            <option value="">Select template...</option>
-            {templates.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
-            ))}
-          </select>
-        </div>
+        <Select name="templateId" label="Template" required>
+          <option value="">Select template...</option>
+          {templates.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.name}
+            </option>
+          ))}
+        </Select>
 
-        <div>
-          <label className="block text-sm font-medium text-zinc-300 mb-1">
-            Candidate Name
-          </label>
-          <input
-            type="text"
-            name="candidateName"
-            required
-            className="w-full px-3 py-2 bg-zinc-700 border border-zinc-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            placeholder="John Doe"
-          />
-        </div>
+        <Input
+          type="text"
+          name="candidateName"
+          label="Candidate Name"
+          required
+          placeholder="John Doe"
+        />
 
-        <div>
-          <label className="block text-sm font-medium text-zinc-300 mb-1">
-            Candidate Email
-          </label>
-          <input
-            type="email"
-            name="candidateEmail"
-            required
-            className="w-full px-3 py-2 bg-zinc-700 border border-zinc-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            placeholder="john@example.com"
-          />
-        </div>
+        <Input
+          type="email"
+          name="candidateEmail"
+          label="Candidate Email"
+          required
+          placeholder="john@example.com"
+        />
       </div>
 
-      <button
-        type="submit"
-        disabled={loading || templates.length === 0}
-        className="px-6 py-2 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-500 transition-colors disabled:opacity-50"
-      >
-        {loading ? "Creating..." : "Create Interview"}
-      </button>
+      <div className="flex items-center gap-4">
+        <Button
+          type="submit"
+          disabled={loading || templates.length === 0}
+          variant="primary"
+        >
+          {loading ? "Creating..." : "Create Interview"}
+        </Button>
 
-      {templates.length === 0 && (
-        <p className="text-yellow-400 text-sm">
-          No published templates available. Create and publish a template first.
-        </p>
-      )}
+        {templates.length === 0 && (
+          <p className="text-amber-400 text-sm flex items-center gap-2">
+            <AlertCircle className="w-4 h-4" />
+            No published templates. Create and publish a template first.
+          </p>
+        )}
+      </div>
     </form>
   );
 }

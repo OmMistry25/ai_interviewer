@@ -3,7 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { updateTemplateVersion, publishTemplateVersion } from "../../actions";
-import Link from "next/link";
+import { Button } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
+import { Save, Globe, CheckCircle, AlertCircle, Code } from "lucide-react";
 
 interface Props {
   versionId: string;
@@ -33,7 +35,7 @@ export function TemplateEditor({ versionId, initialConfig, status }: Props) {
         setSuccess("Saved!");
         setTimeout(() => setSuccess(null), 2000);
       }
-    } catch (e) {
+    } catch {
       setError("Invalid JSON format");
     }
 
@@ -48,7 +50,7 @@ export function TemplateEditor({ versionId, initialConfig, status }: Props) {
     try {
       const parsed = JSON.parse(config);
       await updateTemplateVersion(versionId, parsed);
-    } catch (e) {
+    } catch {
       setError("Invalid JSON format");
       setLoading(false);
       return;
@@ -68,56 +70,58 @@ export function TemplateEditor({ versionId, initialConfig, status }: Props) {
   return (
     <div className="space-y-6">
       {error && (
-        <div className="p-4 bg-red-900/50 border border-red-700 rounded-lg text-red-300">
+        <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 flex items-center gap-2">
+          <AlertCircle className="w-4 h-4" />
           {error}
         </div>
       )}
 
       {success && (
-        <div className="p-4 bg-emerald-900/50 border border-emerald-700 rounded-lg text-emerald-300">
+        <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-lg text-emerald-400 flex items-center gap-2">
+          <CheckCircle className="w-4 h-4" />
           {success}
         </div>
       )}
 
-      <div>
-        <label className="block text-sm font-medium text-zinc-300 mb-2">
+      <Card>
+        <div className="flex items-center gap-2 text-sm text-slate-400 mb-3">
+          <Code className="w-4 h-4" />
           Template Configuration (JSON)
-        </label>
+        </div>
         <textarea
           value={config}
           onChange={(e) => setConfig(e.target.value)}
-          className="w-full h-[500px] px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-white font-mono text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          className="w-full h-[500px] px-4 py-3 bg-slate-900/50 border border-slate-700/60 rounded-lg text-slate-100 font-mono text-sm focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/30 transition-colors"
           spellCheck={false}
         />
-      </div>
+      </Card>
 
-      <div className="flex gap-4">
-        <button
+      <div className="flex gap-3">
+        <Button
           onClick={handleSave}
           disabled={loading}
-          className="px-6 py-3 bg-zinc-700 text-white rounded-lg font-medium hover:bg-zinc-600 transition-colors disabled:opacity-50"
+          variant="secondary"
+          icon={<Save className="w-4 h-4" />}
         >
           {loading ? "Saving..." : "Save Draft"}
-        </button>
+        </Button>
 
-        <button
+        <Button
           onClick={handlePublish}
           disabled={loading}
-          className="px-6 py-3 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-500 transition-colors disabled:opacity-50"
+          variant="primary"
+          icon={<Globe className="w-4 h-4" />}
         >
           {loading ? "Publishing..." : status === "published" ? "Update & Republish" : "Publish"}
-        </button>
+        </Button>
       </div>
 
-      <div className="pt-4 border-t border-zinc-700">
-        <Link href="/admin/templates" className="text-zinc-400 hover:text-white">
-          ← Back to Templates
-        </Link>
-      </div>
-
-      <div className="p-4 bg-zinc-800 rounded-lg border border-zinc-700">
-        <h3 className="font-medium mb-2">Template JSON Structure</h3>
-        <pre className="text-xs text-zinc-400 overflow-x-auto">
+      <Card className="bg-slate-800/30">
+        <h3 className="font-medium text-slate-300 mb-3 flex items-center gap-2">
+          <Code className="w-4 h-4 text-slate-500" />
+          Template JSON Structure
+        </h3>
+        <pre className="text-xs text-slate-500 overflow-x-auto bg-slate-900/50 p-4 rounded-lg">
 {`{
   "system_prompt": "You are a professional interviewer...",
   "voice": { "voice_id": "alloy", "speed": 1.0 },
@@ -137,7 +141,7 @@ export function TemplateEditor({ versionId, initialConfig, status }: Props) {
   }
 }`}
         </pre>
-      </div>
+      </Card>
     </div>
   );
 }

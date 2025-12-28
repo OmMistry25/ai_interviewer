@@ -4,6 +4,9 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createJob, updateJob, publishJob, deleteJob } from "./actions";
 import Link from "next/link";
+import { Button } from "@/components/ui/Button";
+import { Input, Textarea, Select } from "@/components/ui/Input";
+import { ArrowLeft, ExternalLink, Trash2, Globe, AlertCircle } from "lucide-react";
 
 interface JobFormProps {
   templates: { id: string; name: string }[];
@@ -69,125 +72,88 @@ export function JobForm({ templates, job }: JobFormProps) {
   return (
     <form action={handleSubmit} className="space-y-6">
       {error && (
-        <div className="p-4 bg-red-900/50 border border-red-700 rounded-lg text-red-300">
+        <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 flex items-center gap-2">
+          <AlertCircle className="w-4 h-4" />
           {error}
         </div>
       )}
 
-      <div>
-        <label className="block text-sm font-medium text-zinc-300 mb-2">
-          Job Title *
-        </label>
-        <input
-          type="text"
-          name="title"
-          defaultValue={job?.title}
-          required
-          className="w-full px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-          placeholder="e.g., Barista"
-        />
-      </div>
+      <Input
+        type="text"
+        name="title"
+        label="Job Title *"
+        defaultValue={job?.title}
+        required
+        placeholder="e.g., Barista"
+      />
 
-      <div>
-        <label className="block text-sm font-medium text-zinc-300 mb-2">
-          Description
-        </label>
-        <textarea
-          name="description"
-          defaultValue={job?.description}
-          rows={4}
-          className="w-full px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-          placeholder="Describe the role and responsibilities..."
-        />
-      </div>
+      <Textarea
+        name="description"
+        label="Description"
+        defaultValue={job?.description}
+        rows={4}
+        placeholder="Describe the role and responsibilities..."
+      />
 
-      <div>
-        <label className="block text-sm font-medium text-zinc-300 mb-2">
-          Location
-        </label>
-        <input
-          type="text"
-          name="location"
-          defaultValue={job?.location}
-          className="w-full px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-          placeholder="e.g., San Francisco, CA"
-        />
-      </div>
+      <Input
+        type="text"
+        name="location"
+        label="Location"
+        defaultValue={job?.location}
+        placeholder="e.g., San Francisco, CA"
+      />
 
       <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-zinc-300 mb-2">
-            Employment Type
-          </label>
-          <select
-            name="employment_type"
-            defaultValue={job?.employment_type || "full_time"}
-            className="w-full px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-          >
-            <option value="full_time">Full-time</option>
-            <option value="part_time">Part-time</option>
-            <option value="contract">Contract</option>
-          </select>
-        </div>
+        <Select
+          name="employment_type"
+          label="Employment Type"
+          defaultValue={job?.employment_type || "full_time"}
+        >
+          <option value="full_time">Full-time</option>
+          <option value="part_time">Part-time</option>
+          <option value="contract">Contract</option>
+        </Select>
 
         {isEditing && (
-          <div>
-            <label className="block text-sm font-medium text-zinc-300 mb-2">
-              Status
-            </label>
-            <select
-              name="status"
-              defaultValue={job?.status}
-              className="w-full px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            >
-              <option value="draft">Draft</option>
-              <option value="active">Active</option>
-              <option value="paused">Paused</option>
-              <option value="closed">Closed</option>
-            </select>
-          </div>
+          <Select
+            name="status"
+            label="Status"
+            defaultValue={job?.status}
+          >
+            <option value="draft">Draft</option>
+            <option value="active">Active</option>
+            <option value="paused">Paused</option>
+            <option value="closed">Closed</option>
+          </Select>
         )}
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-zinc-300 mb-2">
-            Min Hourly Rate ($)
-          </label>
-          <input
-            type="number"
-            name="hourly_rate_min"
-            defaultValue={job?.hourly_rate_min}
-            step="0.01"
-            min="0"
-            className="w-full px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            placeholder="15.00"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-zinc-300 mb-2">
-            Max Hourly Rate ($)
-          </label>
-          <input
-            type="number"
-            name="hourly_rate_max"
-            defaultValue={job?.hourly_rate_max}
-            step="0.01"
-            min="0"
-            className="w-full px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            placeholder="22.00"
-          />
-        </div>
+        <Input
+          type="number"
+          name="hourly_rate_min"
+          label="Min Hourly Rate ($)"
+          defaultValue={job?.hourly_rate_min}
+          step="0.01"
+          min="0"
+          placeholder="15.00"
+        />
+        <Input
+          type="number"
+          name="hourly_rate_max"
+          label="Max Hourly Rate ($)"
+          defaultValue={job?.hourly_rate_max}
+          step="0.01"
+          min="0"
+          placeholder="22.00"
+        />
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-zinc-300 mb-2">
-          Interview Template
-        </label>
-        <select
+        <Select
           name="template_id"
+          label="Interview Template"
           defaultValue={job?.template_id || ""}
-          className="w-full px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
         >
           <option value="">No interview template</option>
           {templates.map((t) => (
@@ -195,56 +161,63 @@ export function JobForm({ templates, job }: JobFormProps) {
               {t.name}
             </option>
           ))}
-        </select>
-        <p className="text-xs text-zinc-500 mt-1">
+        </Select>
+        <p className="text-xs text-slate-500 mt-2">
           Select which interview template to use for candidates applying to this job.
         </p>
       </div>
 
-      <div className="flex gap-4 pt-4">
-        <button
+      <div className="flex gap-3 pt-4">
+        <Button
           type="submit"
           disabled={loading}
-          className="flex-1 px-6 py-3 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-500 transition-colors disabled:opacity-50"
+          variant="primary"
+          className="flex-1"
         >
           {loading ? "Saving..." : isEditing ? "Save Changes" : "Create Job"}
-        </button>
+        </Button>
 
         {isEditing && job.status === "draft" && (
-          <button
+          <Button
             type="button"
             onClick={handlePublish}
             disabled={loading}
-            className="px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-500 transition-colors disabled:opacity-50"
+            variant="secondary"
+            icon={<Globe className="w-4 h-4" />}
           >
             Publish
-          </button>
+          </Button>
         )}
 
         {isEditing && (
-          <button
+          <Button
             type="button"
             onClick={handleDelete}
             disabled={loading}
-            className="px-6 py-3 bg-red-600 text-white rounded-lg font-medium hover:bg-red-500 transition-colors disabled:opacity-50"
+            variant="danger"
+            icon={<Trash2 className="w-4 h-4" />}
           >
             Delete
-          </button>
+          </Button>
         )}
       </div>
 
       {isEditing && job.status === "active" && (
-        <div className="p-4 bg-zinc-800 rounded-lg border border-zinc-700">
-          <p className="text-sm text-zinc-400 mb-2">Public Application Page:</p>
-          <code className="text-emerald-400 text-sm">
+        <div className="p-4 bg-emerald-500/10 rounded-lg border border-emerald-500/20">
+          <p className="text-sm text-slate-400 mb-2 flex items-center gap-2">
+            <ExternalLink className="w-4 h-4 text-emerald-500" />
+            Public Application Page:
+          </p>
+          <code className="text-amber-400 text-sm">
             {typeof window !== "undefined" ? window.location.origin : ""}/apply/{job.id}
           </code>
         </div>
       )}
 
-      <div className="pt-4 border-t border-zinc-700">
-        <Link href="/admin/jobs" className="text-zinc-400 hover:text-white text-sm">
-          ← Back to Jobs
+      <div className="pt-4 border-t border-slate-700/50">
+        <Link href="/admin/jobs" className="inline-flex items-center gap-2 text-slate-500 hover:text-slate-300 text-sm transition-colors">
+          <ArrowLeft className="w-4 h-4" />
+          Back to Jobs
         </Link>
       </div>
     </form>
