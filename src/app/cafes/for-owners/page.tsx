@@ -5,7 +5,6 @@ import {
   ArrowLeft, 
   Clock, 
   CheckCircle, 
-  Users, 
   Calendar,
   MessageSquare,
   Shield,
@@ -14,17 +13,17 @@ import {
 } from "lucide-react";
 
 export const metadata = {
-  title: "For Cafes - Cliq",
+  title: "For Cafe Owners - Cliq",
   description: "Hire reliable baristas in hours, not weeks. Pre-screened candidates matched to your schedule.",
 };
 
-export default function ForCafesPage() {
+export default function ForCafeOwnersPage() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950">
       {/* Header */}
       <header className="border-b border-slate-800/80 bg-slate-900/90 backdrop-blur-sm sticky top-0 z-10">
         <div className="max-w-5xl mx-auto px-6 py-4 flex justify-between items-center">
-          <Link href="/" className="flex items-center gap-2 text-slate-400 hover:text-slate-200 transition-colors">
+          <Link href="/cafes" className="flex items-center gap-2 text-slate-400 hover:text-slate-200 transition-colors">
             <ArrowLeft className="w-4 h-4" />
             <span className="font-bold text-slate-100">Cliq</span>
           </Link>
@@ -215,8 +214,8 @@ export default function ForCafesPage() {
       <footer className="border-t border-slate-800/80 py-8">
         <div className="max-w-4xl mx-auto px-6 flex justify-between items-center">
           <p className="text-sm text-slate-600">© 2025 Cliq</p>
-          <Link href="/" className="text-sm text-slate-500 hover:text-slate-300 transition-colors">
-            Back to Home
+          <Link href="/cafes" className="text-sm text-slate-500 hover:text-slate-300 transition-colors">
+            Back to Cafes
           </Link>
         </div>
       </footer>

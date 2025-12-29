@@ -23,7 +23,7 @@ export default async function GeneralApplyPage({
       <header className="border-b border-slate-800/80 bg-slate-900/90 backdrop-blur-sm sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-6 py-5 flex items-center gap-4">
           <Link
-            href="/for-baristas"
+            href="/cafes/for-baristas"
             className="text-slate-400 hover:text-slate-200 transition-colors"
           >
             <ArrowLeft className="w-5 h-5" />
