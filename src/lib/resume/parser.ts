@@ -1,14 +1,7 @@
 import OpenAI from "openai";
+import { extractText } from "unpdf";
 import { env } from "@/lib/env";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-
-// Dynamic import of pdf-parse to handle ESM/CJS compatibility
-async function parsePDF(buffer: Buffer): Promise<string> {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const pdfParse = require("pdf-parse");
-  const data = await pdfParse(buffer);
-  return data.text || "";
-}
 
 const openai = new OpenAI({
   apiKey: env.OPENAI_API_KEY,
@@ -133,13 +126,13 @@ async function extractTextFromBuffer(
 
   if (lowerName.endsWith(".pdf")) {
     try {
-      // Use pdf-parse for robust PDF text extraction
-      const pdfBuffer = Buffer.from(buffer);
-      const text = await parsePDF(pdfBuffer);
-      return text;
+      // Use unpdf for serverless-compatible PDF text extraction
+      const uint8Array = new Uint8Array(buffer);
+      const { text } = await extractText(uint8Array, { mergePages: true });
+      return text || "";
     } catch (e) {
       console.error("PDF parsing error:", e);
-      // Fallback to basic extraction if pdf-parse fails
+      // Fallback to basic extraction if unpdf fails
       return extractPDFTextBasic(new Uint8Array(buffer));
     }
   }
