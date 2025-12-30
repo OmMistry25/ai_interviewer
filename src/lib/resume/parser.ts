@@ -2,6 +2,14 @@ import OpenAI from "openai";
 import { env } from "@/lib/env";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
+// Dynamic import of pdf-parse to handle ESM/CJS compatibility
+async function parsePDF(buffer: Buffer): Promise<string> {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const pdfParse = require("pdf-parse");
+  const data = await pdfParse(buffer);
+  return data.text || "";
+}
+
 const openai = new OpenAI({
   apiKey: env.OPENAI_API_KEY,
 });
@@ -111,23 +119,32 @@ export async function extractResumeText(resumePath: string): Promise<string> {
 }
 
 /**
- * Simple text extraction from file buffer
+ * Extract text from file buffer using pdf-parse for PDFs
  */
 async function extractTextFromBuffer(
   buffer: ArrayBuffer,
   filename: string
 ): Promise<string> {
-  if (filename.endsWith(".txt")) {
+  const lowerName = filename.toLowerCase();
+  
+  if (lowerName.endsWith(".txt")) {
     return new TextDecoder().decode(buffer);
   }
 
-  if (filename.endsWith(".pdf")) {
-    const uint8Array = new Uint8Array(buffer);
-    const text = extractPDFText(uint8Array);
-    return text;
+  if (lowerName.endsWith(".pdf")) {
+    try {
+      // Use pdf-parse for robust PDF text extraction
+      const pdfBuffer = Buffer.from(buffer);
+      const text = await parsePDF(pdfBuffer);
+      return text;
+    } catch (e) {
+      console.error("PDF parsing error:", e);
+      // Fallback to basic extraction if pdf-parse fails
+      return extractPDFTextBasic(new Uint8Array(buffer));
+    }
   }
 
-  if (filename.endsWith(".docx") || filename.endsWith(".doc")) {
+  if (lowerName.endsWith(".docx") || lowerName.endsWith(".doc")) {
     return "[Word document - text extraction not implemented. Please upload PDF.]";
   }
 
@@ -135,9 +152,9 @@ async function extractTextFromBuffer(
 }
 
 /**
- * Basic PDF text extraction
+ * Basic PDF text extraction (fallback)
  */
-function extractPDFText(data: Uint8Array): string {
+function extractPDFTextBasic(data: Uint8Array): string {
   const str = new TextDecoder("latin1").decode(data);
   
   const textMatches = str.match(/\(([^)]+)\)/g) || [];
