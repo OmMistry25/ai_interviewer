@@ -216,7 +216,13 @@ export async function analyzeApplicationResume(
   try {
     const resumeText = await extractResumeText(app.resume_path);
     
+    // Log extracted text for debugging
+    console.log("[Resume Analysis] Path:", app.resume_path);
+    console.log("[Resume Analysis] Extracted text length:", resumeText?.length || 0);
+    console.log("[Resume Analysis] First 500 chars:", resumeText?.substring(0, 500));
+    
     if (!resumeText || resumeText.length < 50) {
+      console.error("[Resume Analysis] Text too short or empty");
       return { 
         analysis: null, 
         error: "Could not extract text from resume. Please ensure it's a text-based PDF." 
