@@ -106,8 +106,8 @@ export function ScheduleGrid({ applicationId, interviewToken }: ScheduleGridProp
       return;
     }
 
-    // Refresh the page to show success state
-    router.refresh();
+    // Redirect to profile page
+    router.push(`/candidate/profile/${interviewToken}`);
   };
 
   return (

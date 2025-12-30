@@ -169,6 +169,50 @@ export async function sendScheduleReminderEmail(params: {
 }
 
 /**
+ * Send profile link email after schedule submission
+ */
+export async function sendProfileLinkEmail(params: {
+  to: string;
+  candidateName: string;
+  jobTitle: string;
+  companyName: string;
+  profileUrl: string;
+}) {
+  const html = `
+    <div style="${styles.container}">
+      <div style="${styles.header}">
+        <h1 style="margin: 0; font-size: 24px;">Application Submitted! 🎉</h1>
+      </div>
+      <div style="${styles.body}">
+        <p>Hi ${params.candidateName},</p>
+        <p>Great news! Your application for <strong>${params.jobTitle}</strong> at <strong>${params.companyName}</strong> has been submitted successfully.</p>
+        <p>You can view your complete application profile at any time:</p>
+        <div style="text-align: center;">
+          <a href="${params.profileUrl}" style="${styles.button}">View My Profile</a>
+        </div>
+        <div style="background: white; padding: 20px; border-radius: 8px; margin: 20px 0;">
+          <p style="margin: 0 0 10px 0; font-weight: 600; color: #1e293b;">Your profile includes:</p>
+          <ul style="margin: 0; padding-left: 20px; color: #475569;">
+            <li>Resume analysis results</li>
+            <li>Interview transcript</li>
+            <li>Performance scores</li>
+            <li>Your availability schedule</li>
+          </ul>
+        </div>
+        <p style="color: #64748b; font-size: 14px;">Save this email to access your profile anytime. We'll be in touch soon!</p>
+        <p style="${styles.footer}">${params.companyName}</p>
+      </div>
+    </div>
+  `;
+
+  return sendEmail({
+    to: params.to,
+    subject: `Application Submitted: ${params.jobTitle} at ${params.companyName}`,
+    html,
+  });
+}
+
+/**
  * Send decision notification
  */
 export async function sendDecisionEmail(params: {

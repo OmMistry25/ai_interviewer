@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { VideoRoom } from "@/components/VideoRoom";
 import { TranscriptPanel, TranscriptMessage } from "@/components/TranscriptPanel";
 import { AIAvatar } from "@/components/AIAvatar";
@@ -39,6 +40,7 @@ interface CurrentQuestion {
 }
 
 export function InterviewRoom({ interviewToken, candidateName }: InterviewRoomProps) {
+  const router = useRouter();
   const [credentials, setCredentials] = useState<RtcCredentials | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [phase, setPhase] = useState<InterviewPhase>("not_started");
@@ -411,44 +413,25 @@ export function InterviewRoom({ interviewToken, candidateName }: InterviewRoomPr
     );
   }
 
+  // Redirect to schedule page when interview completes
+  useEffect(() => {
+    if (phase === "completed") {
+      router.push(`/candidate/schedule/${interviewToken}`);
+    }
+  }, [phase, router, interviewToken]);
+
   if (phase === "completed") {
+    // Show brief loading while redirecting
     return (
       <div className="h-screen flex items-center justify-center bg-zinc-950 p-8">
-        <div className="text-center max-w-2xl w-full">
-          <div className="mb-8">
-            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-emerald-600 flex items-center justify-center">
-              <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-            </div>
-            <h1 className="text-3xl font-bold text-emerald-400 mb-2">Interview Complete!</h1>
-            <p className="text-zinc-400">Thank you, {candidateName}</p>
+        <div className="text-center">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-emerald-600 flex items-center justify-center">
+            <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
           </div>
-          <div className="p-6 bg-zinc-800/50 backdrop-blur rounded-2xl border border-zinc-700">
-            <p className="text-zinc-300 mb-4">
-              Great job! One last step — let us know when you&apos;re available to work.
-            </p>
-            
-            {/* Transcript Summary */}
-            <div className="text-left max-h-48 overflow-y-auto mb-6 bg-zinc-900/50 rounded-lg p-4">
-              <h3 className="text-sm font-medium text-zinc-400 mb-3">Interview Summary</h3>
-              <TranscriptPanel messages={messages} />
-            </div>
-            
-            {/* Submit Schedule Button */}
-            <a
-              href={`/candidate/schedule/${interviewToken}`}
-              className="inline-flex items-center justify-center gap-2 w-full px-8 py-4 bg-emerald-600 text-white rounded-xl font-medium hover:bg-emerald-500 transition-colors text-lg"
-            >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-              Submit My Schedule
-            </a>
-            <p className="text-zinc-500 text-sm mt-3">
-              Your application won&apos;t be submitted until you complete this step.
-            </p>
-          </div>
+          <h1 className="text-2xl font-bold text-emerald-400 mb-2">Interview Complete!</h1>
+          <p className="text-zinc-400">Redirecting to schedule your availability...</p>
         </div>
       </div>
     );

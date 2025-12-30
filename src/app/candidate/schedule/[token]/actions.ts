@@ -1,6 +1,7 @@
 "use server";
 
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { sendProfileLinkEmail } from "@/lib/email/templates";
 import { z } from "zod";
 
 const AvailabilitySchema = z.object({
@@ -52,6 +53,45 @@ export async function submitScheduleAvailability(
     return { success: false, error: "Failed to save availability" };
   }
 
+  // Send profile link email in background
+  sendProfileEmail(applicationId).catch(console.error);
+
   return { success: true };
+}
+
+async function sendProfileEmail(applicationId: string) {
+  const adminClient = createSupabaseAdminClient();
+
+  // Get application with related data
+  const { data: application } = await adminClient
+    .from("applications")
+    .select(`
+      id,
+      candidates (first_name, email),
+      job_postings (title, organizations (name)),
+      interviews (access_token)
+    `)
+    .eq("id", applicationId)
+    .single();
+
+  if (!application) return;
+
+  const candidate = application.candidates as unknown as { first_name: string; email: string } | null;
+  const job = application.job_postings as unknown as { title: string; organizations: { name: string } } | null;
+  const interviews = application.interviews as unknown as Array<{ access_token: string }> | null;
+  const interview = interviews?.[0];
+
+  if (!candidate?.email || !interview?.access_token) return;
+
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const profileUrl = `${baseUrl}/candidate/profile/${interview.access_token}`;
+
+  await sendProfileLinkEmail({
+    to: candidate.email,
+    candidateName: candidate.first_name,
+    jobTitle: job?.title || "Position",
+    companyName: job?.organizations?.name || "Company",
+    profileUrl,
+  });
 }
 
