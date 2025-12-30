@@ -155,6 +155,20 @@ export async function completeInterview(interviewId: string): Promise<void> {
       summary,
     })
     .eq("id", interviewId);
+
+  // Also update linked application status to "interviewed"
+  const { data: interview } = await adminClient
+    .from("interviews")
+    .select("application_id")
+    .eq("id", interviewId)
+    .single();
+
+  if (interview?.application_id) {
+    await adminClient
+      .from("applications")
+      .update({ status: "interviewed" })
+      .eq("id", interview.application_id);
+  }
 }
 
 /**
