@@ -133,6 +133,42 @@ export async function sendInterviewReminderEmail(params: {
 }
 
 /**
+ * Send schedule reminder (for candidates who completed interview but haven't submitted availability)
+ */
+export async function sendScheduleReminderEmail(params: {
+  to: string;
+  candidateName: string;
+  jobTitle: string;
+  companyName: string;
+  scheduleUrl: string;
+}) {
+  const html = `
+    <div style="${styles.container}">
+      <div style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
+        <h1 style="margin: 0; font-size: 24px;">Complete Your Application</h1>
+      </div>
+      <div style="${styles.body}">
+        <p>Hi ${params.candidateName},</p>
+        <p>Great job completing your interview for the <strong>${params.jobTitle}</strong> position at <strong>${params.companyName}</strong>!</p>
+        <p>There's just one more step: <strong>let us know when you're available to work.</strong></p>
+        <p style="color: #dc2626; font-weight: 500;">⚠️ Your application won't be submitted until you complete this step.</p>
+        <div style="text-align: center;">
+          <a href="${params.scheduleUrl}" style="${styles.button}; background: #f59e0b;">Submit My Schedule</a>
+        </div>
+        <p style="color: #64748b; font-size: 14px;">This only takes 1 minute — just check off the days and times you can work.</p>
+        <p style="${styles.footer}">${params.companyName}</p>
+      </div>
+    </div>
+  `;
+
+  return sendEmail({
+    to: params.to,
+    subject: `Action Required: Complete your ${params.jobTitle} application`,
+    html,
+  });
+}
+
+/**
  * Send decision notification
  */
 export async function sendDecisionEmail(params: {
