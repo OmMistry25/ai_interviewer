@@ -5,7 +5,7 @@ import { redirect, notFound } from "next/navigation";
 import { DecisionButtons } from "./DecisionButtons";
 import { Card, CardHeader } from "@/components/ui/Card";
 import { StatusBadge, Badge } from "@/components/ui/Badge";
-import { ArrowLeft, FileText, BarChart3, MessageSquare, Brain, CheckCircle, AlertTriangle, GraduationCap, Star } from "lucide-react";
+import { ArrowLeft, FileText, BarChart3, MessageSquare, Brain, CheckCircle, AlertTriangle, GraduationCap, Star, Calendar, Clock } from "lucide-react";
 
 interface Props {
   params: Promise<{ applicationId: string }>;
@@ -27,6 +27,8 @@ export default async function CandidateDetailPage({ params }: Props) {
       status,
       resume_path,
       resume_analysis,
+      schedule_availability,
+      schedule_submitted_at,
       created_at,
       candidates (
         id,
@@ -95,6 +97,23 @@ export default async function CandidateDetailPage({ params }: Props) {
     fit_score?: number;
   } | null;
 
+  // Schedule availability
+  const scheduleAvailability = application.schedule_availability as unknown as Record<string, string[]> | null;
+  const scheduleSubmittedAt = application.schedule_submitted_at as string | null;
+  
+  // Days and shifts for display
+  const DAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
+  const DAY_LABELS: Record<string, string> = {
+    monday: "Mon", tuesday: "Tue", wednesday: "Wed", thursday: "Thu",
+    friday: "Fri", saturday: "Sat", sunday: "Sun"
+  };
+  const SHIFT_LABELS: Record<string, string> = {
+    morning: "Morning (6am-10am)",
+    afternoon: "Afternoon (10am-2pm)", 
+    evening: "Evening (2pm-6pm)",
+    night: "Night (6pm-10pm)"
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 text-slate-100 p-8">
       <div className="max-w-4xl mx-auto">
@@ -123,9 +142,69 @@ export default async function CandidateDetailPage({ params }: Props) {
         </div>
 
         {/* Decision Buttons */}
-        {application.status === "interviewed" && (
+        {(application.status === "interviewed" || application.status === "scheduled") && (
           <Card className="mb-6">
             <DecisionButtons applicationId={application.id} />
+          </Card>
+        )}
+
+        {/* Schedule Availability */}
+        {scheduleAvailability && (
+          <Card className="mb-6">
+            <CardHeader title="Work Availability" icon={<Calendar className="w-5 h-5" />} />
+            {scheduleSubmittedAt && (
+              <p className="text-xs text-slate-500 mb-4">
+                Submitted {new Date(scheduleSubmittedAt).toLocaleDateString()}
+              </p>
+            )}
+            
+            <div className="overflow-x-auto">
+              <table className="w-full table-fixed text-sm">
+                <thead>
+                  <tr>
+                    <th className="p-2 text-left text-slate-500 w-32"></th>
+                    {DAYS.map((day) => (
+                      <th key={day} className="p-2 text-center text-slate-400 font-medium">
+                        {DAY_LABELS[day]}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {["morning", "afternoon", "evening", "night"].map((shift) => (
+                    <tr key={shift}>
+                      <td className="p-2 text-slate-400 capitalize">{shift}</td>
+                      {DAYS.map((day) => {
+                        const isAvailable = scheduleAvailability[day]?.includes(shift);
+                        return (
+                          <td key={`${day}-${shift}`} className="p-2 text-center">
+                            {isAvailable ? (
+                              <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400">
+                                <CheckCircle className="w-4 h-4" />
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-slate-800/30 text-slate-700">
+                                –
+                              </span>
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            
+            {/* Summary of availability */}
+            <div className="mt-4 pt-4 border-t border-slate-700/50">
+              <p className="text-sm text-slate-400">
+                <span className="text-emerald-400 font-medium">
+                  {Object.values(scheduleAvailability).flat().length}
+                </span>{" "}
+                shifts available per week
+              </p>
+            </div>
           </Card>
         )}
 

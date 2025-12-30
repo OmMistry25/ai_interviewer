@@ -107,6 +107,18 @@ export default async function SchedulePage({ params }: { params: Params }) {
             templateId={job.template_id}
           />
         </Card>
+
+        {/* Take Interview Now Option */}
+        <div className="mt-6 text-center">
+          <p className="text-slate-500 text-sm mb-3">Or if you&apos;re ready now...</p>
+          <ScheduleForm 
+            applicationId={applicationId} 
+            token={token}
+            jobId={job.id}
+            templateId={job.template_id}
+            immediateMode={true}
+          />
+        </div>
       </div>
     </div>
   );

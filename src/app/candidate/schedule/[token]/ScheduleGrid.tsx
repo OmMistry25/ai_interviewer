@@ -120,12 +120,12 @@ export function ScheduleGrid({ applicationId, interviewToken }: ScheduleGridProp
 
       {/* Grid */}
       <div className="overflow-x-auto">
-        <table className="w-full">
+        <table className="w-full table-fixed">
           <thead>
             <tr>
-              <th className="p-2 text-left text-sm font-medium text-slate-500"></th>
+              <th className="p-2 text-left text-sm font-medium text-slate-500 w-24"></th>
               {DAYS.map((day) => (
-                <th key={day.id} className="p-2 text-center">
+                <th key={day.id} className="p-1 text-center w-12">
                   <button
                     onClick={() => toggleDay(day.id)}
                     className="text-sm font-medium text-slate-300 hover:text-slate-100 transition-colors"
@@ -153,12 +153,12 @@ export function ScheduleGrid({ applicationId, interviewToken }: ScheduleGridProp
                 {DAYS.map((day) => {
                   const isSelected = availability[day.id].includes(shift.id);
                   return (
-                    <td key={`${day.id}-${shift.id}`} className="p-2">
+                    <td key={`${day.id}-${shift.id}`} className="p-1">
                       <button
                         onClick={() => toggleShift(day.id, shift.id)}
                         className={`
-                          w-full aspect-square rounded-lg border-2 transition-all duration-200
-                          flex items-center justify-center
+                          w-10 h-10 rounded-lg border-2 transition-all duration-200
+                          flex items-center justify-center mx-auto
                           ${isSelected
                             ? "bg-emerald-500/20 border-emerald-500 text-emerald-400"
                             : "bg-slate-800/30 border-slate-700/50 hover:border-slate-600 text-slate-600"

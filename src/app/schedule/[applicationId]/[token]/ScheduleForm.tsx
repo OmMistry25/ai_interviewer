@@ -10,14 +10,61 @@ interface ScheduleFormProps {
   token: string;
   jobId: string;
   templateId: string | null;
+  immediateMode?: boolean;
 }
 
-export function ScheduleForm({ applicationId, token, jobId, templateId }: ScheduleFormProps) {
+export function ScheduleForm({ applicationId, token, jobId, templateId, immediateMode = false }: ScheduleFormProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState("");
   const [selectedTime, setSelectedTime] = useState("");
   const [interviewUrl, setInterviewUrl] = useState<string | null>(null);
+
+  // Handle immediate interview start
+  async function handleStartNow() {
+    setLoading(true);
+    setError(null);
+
+    const scheduledAt = new Date(); // Now
+
+    const result = await scheduleInterview({
+      applicationId,
+      token,
+      jobId,
+      templateId,
+      scheduledAt: scheduledAt.toISOString(),
+    });
+
+    if (result.error) {
+      setError(result.error);
+      setLoading(false);
+      return;
+    }
+
+    // Redirect directly to interview
+    if (result.interviewUrl) {
+      window.location.href = result.interviewUrl;
+    }
+  }
+
+  if (immediateMode) {
+    return (
+      <div>
+        {error && (
+          <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">
+            {error}
+          </div>
+        )}
+        <button
+          onClick={handleStartNow}
+          disabled={loading}
+          className="w-full py-3 px-6 bg-emerald-600 text-white rounded-lg font-semibold hover:bg-emerald-500 transition-colors disabled:opacity-50"
+        >
+          {loading ? "Setting up..." : "Take Interview Now →"}
+        </button>
+      </div>
+    );
+  }
 
   // Generate time slots (every 30 minutes from 8am to 8pm)
   const timeSlots = [];

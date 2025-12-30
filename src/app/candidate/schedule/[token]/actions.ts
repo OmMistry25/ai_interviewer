@@ -37,12 +37,13 @@ export async function submitScheduleAvailability(
   }
 
   // Update application with availability
+  // Status becomes "interviewed" - they've completed interview + submitted availability
   const { error: updateError } = await adminClient
     .from("applications")
     .update({
       schedule_availability: parsed.data,
       schedule_submitted_at: new Date().toISOString(),
-      status: "scheduled", // Update status to indicate they've completed the full flow
+      status: "interviewed",
     })
     .eq("id", applicationId);
 
