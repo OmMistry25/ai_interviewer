@@ -359,6 +359,13 @@ export function InterviewRoom({ interviewToken, candidateName }: InterviewRoomPr
     };
   }, []);
 
+  // Redirect to schedule page when interview completes
+  useEffect(() => {
+    if (phase === "completed") {
+      router.push(`/candidate/schedule/${interviewToken}`);
+    }
+  }, [phase, router, interviewToken]);
+
   // Derive avatar state from phase
   const avatarState = 
     phase === "ai_speaking" ? "speaking" :
@@ -412,13 +419,6 @@ export function InterviewRoom({ interviewToken, candidateName }: InterviewRoomPr
       </div>
     );
   }
-
-  // Redirect to schedule page when interview completes
-  useEffect(() => {
-    if (phase === "completed") {
-      router.push(`/candidate/schedule/${interviewToken}`);
-    }
-  }, [phase, router, interviewToken]);
 
   if (phase === "completed") {
     // Show brief loading while redirecting
