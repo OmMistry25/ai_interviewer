@@ -71,6 +71,21 @@ export function InterviewRoom({ interviewToken, candidateName }: InterviewRoomPr
     setMessages((prev) => [...prev, { speaker, text, timestamp: new Date() }]);
   }, []);
 
+  // Helper to speak text with graceful error handling for iOS Safari
+  const safeSpeakText = useCallback(async (
+    text: string,
+    options?: { interviewId?: string; questionId?: string }
+  ) => {
+    try {
+      await speakText(text, options);
+    } catch (e) {
+      // TTS failed (possibly iOS audio restriction) - continue without audio
+      console.warn("TTS failed, continuing without audio:", e);
+      // Give user time to read the text
+      await new Promise(resolve => setTimeout(resolve, Math.min(text.length * 50, 5000)));
+    }
+  }, []);
+
   // Handle pause completion - submit the answer (uses refs for stability)
   const handlePauseComplete = useCallback(async () => {
     const creds = credentialsRef.current;
@@ -155,7 +170,7 @@ export function InterviewRoom({ interviewToken, candidateName }: InterviewRoomPr
         // Disable detection for final message
         audioCaptureRef.current?.disableDetection();
         setPhase("ai_speaking");
-        await speakText(
+        await safeSpeakText(
           "Thank you for completing the interview. We will be in touch soon."
         );
 
@@ -179,7 +194,7 @@ export function InterviewRoom({ interviewToken, candidateName }: InterviewRoomPr
         audioCaptureRef.current?.disableDetection();
         setPhase("ai_speaking");
         
-        await speakText(nextData.prompt, {
+        await safeSpeakText(nextData.prompt, {
           interviewId: creds.interviewId,
           questionId: currentQuestionRef.current?.id,
         });
@@ -206,7 +221,7 @@ export function InterviewRoom({ interviewToken, candidateName }: InterviewRoomPr
         audioCaptureRef.current?.disableDetection();
         setPhase("ai_speaking");
         
-        await speakText(nextData.question.prompt, {
+        await safeSpeakText(nextData.question.prompt, {
           interviewId: creds.interviewId,
           questionId: nextData.question.id,
         });
@@ -222,7 +237,7 @@ export function InterviewRoom({ interviewToken, candidateName }: InterviewRoomPr
       setError(e instanceof Error ? e.message : "Failed to process answer");
       isProcessingRef.current = false;
     }
-  }, [addMessage]);
+  }, [addMessage, safeSpeakText]);
 
   // Start the actual interview questions
   const startInterviewQuestions = useCallback(async (interviewId: string) => {
@@ -251,7 +266,7 @@ export function InterviewRoom({ interviewToken, candidateName }: InterviewRoomPr
       audioCaptureRef.current?.disableDetection();
       setPhase("ai_speaking");
       
-      await speakText(startData.question.prompt, {
+      await safeSpeakText(startData.question.prompt, {
         interviewId,
         questionId: startData.question.id,
       });
@@ -260,10 +275,11 @@ export function InterviewRoom({ interviewToken, candidateName }: InterviewRoomPr
       audioCaptureRef.current?.enableDetection();
       setPhase("listening");
     } catch (e) {
+      console.error("startInterviewQuestions error:", e);
       setError(e instanceof Error ? e.message : "Failed to start interview");
       setPhase("not_started");
     }
-  }, [addMessage]);
+  }, [addMessage, safeSpeakText]);
 
   // Handle audio stream from VideoRoom - STABLE callback (no dependencies that change)
   const handleAudioStream = useCallback((stream: MediaStream) => {
@@ -333,15 +349,38 @@ export function InterviewRoom({ interviewToken, candidateName }: InterviewRoomPr
     setPhase("connecting");
     streamInitializedRef.current = false;
 
-    // Create AudioContext immediately in user gesture context (required for iOS Safari)
-    // This must happen synchronously in the click handler before any await
+    // === iOS Safari Audio Unlock ===
+    // Both AudioContext and HTML Audio need to be "unlocked" during a user gesture.
+    // We do this synchronously before any async operations.
+    
+    // 1. Create and resume AudioContext (for audio processing)
     if (!audioContextRef.current) {
       try {
         audioContextRef.current = new AudioContext({ sampleRate: 16000 });
-        console.log("AudioContext created in user gesture context");
+        // Resume immediately in user gesture
+        if (audioContextRef.current.state === "suspended") {
+          audioContextRef.current.resume();
+        }
+        console.log("AudioContext created and resumed in user gesture context");
       } catch (e) {
         console.error("Failed to create AudioContext:", e);
       }
+    }
+    
+    // 2. Play silent audio to unlock HTML Audio API (for TTS playback)
+    // IMPORTANT: Do NOT await this - keep it synchronous to preserve user gesture context
+    try {
+      const silentAudio = new Audio("data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA");
+      silentAudio.volume = 0.01;
+      // Fire and forget - the play() call itself unlocks audio on iOS
+      silentAudio.play().then(() => {
+        silentAudio.pause();
+        console.log("HTML Audio unlocked for iOS Safari");
+      }).catch(() => {
+        console.log("Silent audio play failed - may affect TTS on iOS");
+      });
+    } catch (e) {
+      // Ignore - this is just a best-effort unlock
     }
 
     try {
