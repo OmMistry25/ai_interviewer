@@ -52,6 +52,7 @@ export function InterviewRoom({ interviewToken, candidateName }: InterviewRoomPr
   // Use refs for values that callbacks need but shouldn't cause re-renders
   const audioCaptureRef = useRef<AudioCapture | null>(null);
   const audioBufferRef = useRef<AudioBuffer | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null); // Created on user click for iOS Safari
   const isProcessingRef = useRef(false);
   const pendingInterviewStartRef = useRef<string | null>(null);
   const credentialsRef = useRef<RtcCredentials | null>(null);
@@ -275,10 +276,12 @@ export function InterviewRoom({ interviewToken, candidateName }: InterviewRoomPr
     // Initialize audio buffer
     audioBufferRef.current = new AudioBuffer();
     
-    // Create AudioCapture with the shared stream
+    // Create AudioCapture with the shared stream and pre-created AudioContext
+    // The audioContext was created in startInterview() during user gesture for iOS Safari compatibility
     // Uses optimized defaults: 1.5s delay, 3.5s total, 500ms min speech, 0.02 RMS threshold
     const capture = new AudioCapture({
       existingStream: stream,
+      audioContext: audioContextRef.current ?? undefined, // Pass pre-created context for iOS
       onAudioData: (pcm) => {
         audioBufferRef.current?.addChunk(pcm);
       },
@@ -330,6 +333,17 @@ export function InterviewRoom({ interviewToken, candidateName }: InterviewRoomPr
     setPhase("connecting");
     streamInitializedRef.current = false;
 
+    // Create AudioContext immediately in user gesture context (required for iOS Safari)
+    // This must happen synchronously in the click handler before any await
+    if (!audioContextRef.current) {
+      try {
+        audioContextRef.current = new AudioContext({ sampleRate: 16000 });
+        console.log("AudioContext created in user gesture context");
+      } catch (e) {
+        console.error("Failed to create AudioContext:", e);
+      }
+    }
+
     try {
       const rtcRes = await fetch("/api/rtc/token", {
         method: "POST",
@@ -356,6 +370,11 @@ export function InterviewRoom({ interviewToken, candidateName }: InterviewRoomPr
     return () => {
       audioCaptureRef.current?.stop();
       stopSpeaking();
+      // Close the AudioContext if we created it
+      if (audioContextRef.current) {
+        audioContextRef.current.close();
+        audioContextRef.current = null;
+      }
     };
   }, []);
 

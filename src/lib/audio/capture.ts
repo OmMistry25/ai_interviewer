@@ -26,6 +26,8 @@ export interface AudioCaptureOptions {
   minSpeechDurationMs?: number;
   /** Existing MediaStream to use instead of requesting a new one */
   existingStream?: MediaStream;
+  /** Pre-created AudioContext (required for iOS Safari - must be created from user gesture) */
+  audioContext?: AudioContext;
 }
 
 export class AudioCapture {
@@ -35,8 +37,9 @@ export class AudioCapture {
   private analyser: AnalyserNode | null = null;
   private source: MediaStreamAudioSourceNode | null = null;
   private ownsStream = true; // Whether we created the stream and should stop it
+  private ownsContext = true; // Whether we created the AudioContext and should close it
 
-  private options: Required<Omit<AudioCaptureOptions, 'existingStream'>> & { existingStream?: MediaStream };
+  private options: Required<Omit<AudioCaptureOptions, 'existingStream' | 'audioContext'>> & { existingStream?: MediaStream; audioContext?: AudioContext };
   private isSilent = true;
   private silenceStartTime: number | null = null;
   private lastProgressUpdate = 0;
@@ -61,6 +64,7 @@ export class AudioCapture {
       silenceThresholdMs: options.silenceThresholdMs ?? 3500, // Reduced from 5000
       minSpeechDurationMs: options.minSpeechDurationMs ?? 500, // New: minimum speech before pause detection
       existingStream: options.existingStream,
+      audioContext: options.audioContext,
     };
   }
 
@@ -82,9 +86,22 @@ export class AudioCapture {
         this.ownsStream = true;
       }
 
-      this.audioContext = new AudioContext({
-        sampleRate: this.options.sampleRate,
-      });
+      // Use provided AudioContext or create a new one
+      // Note: For iOS Safari, AudioContext must be created from a user gesture
+      if (this.options.audioContext) {
+        this.audioContext = this.options.audioContext;
+        this.ownsContext = false;
+      } else {
+        this.audioContext = new AudioContext({
+          sampleRate: this.options.sampleRate,
+        });
+        this.ownsContext = true;
+      }
+
+      // Resume AudioContext if suspended (required for iOS Safari)
+      if (this.audioContext.state === "suspended") {
+        await this.audioContext.resume();
+      }
 
       this.source = this.audioContext.createMediaStreamSource(this.stream);
       this.analyser = this.audioContext.createAnalyser();
@@ -255,10 +272,11 @@ export class AudioCapture {
       this.source.disconnect();
       this.source = null;
     }
-    if (this.audioContext) {
+    // Only close the AudioContext if we created it
+    if (this.audioContext && this.ownsContext) {
       this.audioContext.close();
-      this.audioContext = null;
     }
+    this.audioContext = null;
     // Only stop the stream if we created it
     if (this.stream && this.ownsStream) {
       this.stream.getTracks().forEach((track) => track.stop());
