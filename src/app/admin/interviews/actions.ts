@@ -41,7 +41,7 @@ export async function createInterview(formData: FormData) {
     return { error: "No published version found for this template" };
   }
 
-  // 1. Create or find candidate by email
+  // 1. Create or find/update candidate by email
   let candidateId: string;
   
   const { data: existingCandidate } = await adminClient
@@ -51,6 +51,15 @@ export async function createInterview(formData: FormData) {
     .single();
 
   if (existingCandidate) {
+    // Update existing candidate's name to the new one
+    await adminClient
+      .from("candidates")
+      .update({
+        first_name: firstName,
+        last_name: lastName,
+      })
+      .eq("id", existingCandidate.id);
+    
     candidateId = existingCandidate.id;
   } else {
     const { data: newCandidate, error: candidateError } = await adminClient
