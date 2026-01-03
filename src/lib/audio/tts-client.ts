@@ -1,11 +1,22 @@
 /**
  * Client-side helper to request TTS and play audio with streaming support
  * Supports interruption handling for natural conversation flow
+ * Supports Web Audio API for iOS Safari compatibility
  */
 
 let currentAudio: HTMLAudioElement | null = null;
 let currentResolve: (() => void) | null = null;
 let abortController: AbortController | null = null;
+let currentSource: AudioBufferSourceNode | null = null;
+let sharedAudioContext: AudioContext | null = null;
+
+/**
+ * Set a shared AudioContext for iOS Safari compatibility
+ * This should be called with an AudioContext created during a user gesture
+ */
+export function setAudioContext(ctx: AudioContext): void {
+  sharedAudioContext = ctx;
+}
 
 /**
  * Stop any currently playing TTS audio
@@ -17,6 +28,17 @@ export function stopSpeaking(): void {
     abortController = null;
   }
   
+  // Stop Web Audio source if playing
+  if (currentSource) {
+    try {
+      currentSource.stop();
+    } catch (e) {
+      // Ignore - might already be stopped
+    }
+    currentSource = null;
+  }
+  
+  // Stop HTML Audio if playing
   if (currentAudio) {
     currentAudio.pause();
     currentAudio.currentTime = 0;
@@ -36,7 +58,7 @@ export function stopSpeaking(): void {
  * Check if TTS is currently speaking
  */
 export function isSpeaking(): boolean {
-  return currentAudio !== null && !currentAudio.paused;
+  return (currentAudio !== null && !currentAudio.paused) || currentSource !== null;
 }
 
 /**
@@ -104,13 +126,49 @@ export async function speakText(
       totalLength += value.length;
     }
 
-    // Create blob and play audio
+    // Create blob from chunks
     const audioBlob = new Blob(chunks, { type: "audio/mpeg" });
+    
+    options?.onStart?.();
+
+    // Try Web Audio API first (works on iOS Safari with pre-unlocked context)
+    if (sharedAudioContext) {
+      try {
+        // Resume context if suspended
+        if (sharedAudioContext.state === "suspended") {
+          await sharedAudioContext.resume();
+        }
+        
+        const arrayBuffer = await audioBlob.arrayBuffer();
+        const audioBuffer = await sharedAudioContext.decodeAudioData(arrayBuffer);
+        
+        const source = sharedAudioContext.createBufferSource();
+        source.buffer = audioBuffer;
+        source.connect(sharedAudioContext.destination);
+        currentSource = source;
+        
+        return new Promise<void>((resolve) => {
+          currentResolve = resolve;
+          
+          source.onended = () => {
+            options?.onEnd?.();
+            currentSource = null;
+            currentResolve = null;
+            resolve();
+          };
+          
+          source.start(0);
+        });
+      } catch (webAudioError) {
+        console.warn("Web Audio playback failed, trying HTML Audio:", webAudioError);
+        // Fall through to HTML Audio
+      }
+    }
+    
+    // Fallback to HTML Audio (works on desktop, may fail on iOS)
     const audioUrl = URL.createObjectURL(audioBlob);
     const audio = new Audio(audioUrl);
     currentAudio = audio;
-    
-    options?.onStart?.();
 
     return new Promise((resolve, reject) => {
       currentResolve = resolve;

@@ -8,7 +8,7 @@ import { AIAvatar } from "@/components/AIAvatar";
 import { PauseIndicator } from "@/components/PauseIndicator";
 import { AudioCapture } from "@/lib/audio/capture";
 import { AudioBuffer } from "@/lib/audio/buffer";
-import { speakText, stopSpeaking } from "@/lib/audio/tts-client";
+import { speakText, stopSpeaking, setAudioContext } from "@/lib/audio/tts-client";
 
 interface InterviewRoomProps {
   interviewToken: string;
@@ -353,7 +353,7 @@ export function InterviewRoom({ interviewToken, candidateName }: InterviewRoomPr
     // Both AudioContext and HTML Audio need to be "unlocked" during a user gesture.
     // We do this synchronously before any async operations.
     
-    // 1. Create and resume AudioContext (for audio processing)
+    // 1. Create and resume AudioContext (for audio processing AND TTS playback on iOS)
     if (!audioContextRef.current) {
       try {
         audioContextRef.current = new AudioContext({ sampleRate: 16000 });
@@ -361,7 +361,9 @@ export function InterviewRoom({ interviewToken, candidateName }: InterviewRoomPr
         if (audioContextRef.current.state === "suspended") {
           audioContextRef.current.resume();
         }
-        console.log("AudioContext created and resumed in user gesture context");
+        // Share with TTS client for iOS Safari audio playback
+        setAudioContext(audioContextRef.current);
+        console.log("AudioContext created, resumed, and shared with TTS client");
       } catch (e) {
         console.error("Failed to create AudioContext:", e);
       }
