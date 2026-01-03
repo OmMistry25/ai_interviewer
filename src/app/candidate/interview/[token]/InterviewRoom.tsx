@@ -498,19 +498,19 @@ export function InterviewRoom({ interviewToken, candidateName }: InterviewRoomPr
   }
 
   return (
-    <div className="h-screen bg-zinc-950 flex flex-col">
-      {/* Header */}
-      <header className="px-6 py-4 border-b border-zinc-800 flex items-center justify-between">
-        <div>
-          <h1 className="text-lg font-semibold text-white">{candidateName}</h1>
-          <p className="text-sm text-zinc-500">Interview in progress</p>
+    <div className="h-screen bg-zinc-950 flex flex-col overflow-hidden">
+      {/* Header - compact on mobile */}
+      <header className="px-3 py-2 md:px-6 md:py-4 border-b border-zinc-800 flex items-center justify-between shrink-0">
+        <div className="min-w-0">
+          <h1 className="text-sm md:text-lg font-semibold text-white truncate">{candidateName}</h1>
+          <p className="text-xs md:text-sm text-zinc-500 hidden sm:block">Interview in progress</p>
         </div>
-        <div className="flex items-center gap-4">
-          <span className="text-sm text-zinc-400">
-            Question {(currentQuestion?.index ?? 0) + 1} of {currentQuestion?.total ?? "?"}
+        <div className="flex items-center gap-2 md:gap-4 shrink-0">
+          <span className="text-xs md:text-sm text-zinc-400">
+            Q {(currentQuestion?.index ?? 0) + 1}/{currentQuestion?.total ?? "?"}
           </span>
           <span
-            className={`px-3 py-1.5 rounded-full text-xs font-medium ${
+            className={`px-2 py-1 md:px-3 md:py-1.5 rounded-full text-xs font-medium whitespace-nowrap ${
               phase === "ai_speaking"
                 ? "bg-blue-500/20 text-blue-400"
                 : phase === "detecting_pause"
@@ -520,7 +520,7 @@ export function InterviewRoom({ interviewToken, candidateName }: InterviewRoomPr
                 : "bg-emerald-500/20 text-emerald-400"
             }`}
           >
-            {phase === "ai_speaking" && "Interviewer Speaking"}
+            {phase === "ai_speaking" && "Speaking"}
             {phase === "listening" && "Listening"}
             {phase === "detecting_pause" && "Listening..."}
             {phase === "processing" && "Processing"}
@@ -529,11 +529,11 @@ export function InterviewRoom({ interviewToken, candidateName }: InterviewRoomPr
         </div>
       </header>
 
-      {/* Main content */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Video area */}
-        <div className="flex-1 p-4 flex flex-col">
-          <div className="flex-1 relative rounded-xl overflow-hidden">
+      {/* Main content - responsive layout */}
+      <div className="flex-1 flex overflow-hidden min-h-0">
+        {/* Video area - takes full width on mobile */}
+        <div className="flex-1 p-2 md:p-4 flex flex-col min-w-0">
+          <div className="flex-1 relative rounded-xl overflow-hidden min-h-0">
             {credentials && (
               <VideoRoom
                 token={credentials.token}
@@ -542,52 +542,53 @@ export function InterviewRoom({ interviewToken, candidateName }: InterviewRoomPr
                 onAudioStream={handleAudioStream}
               >
                 {/* AI Avatar overlay - bottom right */}
-                <div className="absolute bottom-4 right-4">
+                <div className="absolute bottom-2 right-2 md:bottom-4 md:right-4">
                   <AIAvatar state={avatarState} size="md" />
                 </div>
               </VideoRoom>
             )}
           </div>
 
-          {/* Status bar */}
-          <div className="mt-4 px-4 py-3 bg-zinc-800/50 rounded-xl border border-zinc-700 flex items-center justify-between">
-            <div className="flex items-center gap-4">
+          {/* Status bar - simplified on mobile */}
+          <div className="mt-2 md:mt-4 px-3 py-2 md:px-4 md:py-3 bg-zinc-800/50 rounded-xl border border-zinc-700 shrink-0">
+            <div className="flex items-center gap-2 md:gap-4">
               {phase === "detecting_pause" && (
                 <PauseIndicator active={true} progress={pauseProgress} />
               )}
               {phase === "listening" && (
-                <span className="text-sm text-emerald-400 flex items-center gap-2">
+                <span className="text-xs md:text-sm text-emerald-400 flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                   Speak your answer...
                 </span>
               )}
               {phase === "ai_speaking" && (
-                <span className="text-sm text-blue-400">
+                <span className="text-xs md:text-sm text-blue-400">
                   Listening to interviewer...
                 </span>
               )}
               {phase === "processing" && (
-                <span className="text-sm text-purple-400 animate-pulse">
-                  Processing your response...
+                <span className="text-xs md:text-sm text-purple-400 animate-pulse">
+                  Processing...
                 </span>
               )}
               {(phase === "connecting" || phase === "waiting_for_stream") && (
-                <span className="text-sm text-zinc-400 animate-pulse">
-                  Setting up your interview...
+                <span className="text-xs md:text-sm text-zinc-400 animate-pulse">
+                  Setting up...
                 </span>
               )}
             </div>
 
+            {/* Current question - hidden on mobile, shown on tablet+ */}
             {currentQuestion && (
-              <p className="text-sm text-zinc-400 max-w-md truncate">
+              <p className="hidden md:block text-sm text-zinc-400 max-w-md truncate mt-2">
                 {currentQuestion.prompt}
               </p>
             )}
           </div>
         </div>
 
-        {/* Transcript panel */}
-        <div className="w-80 border-l border-zinc-800 p-4">
+        {/* Transcript panel - hidden on mobile (portrait), shown on tablet/desktop */}
+        <div className="hidden lg:block w-80 border-l border-zinc-800 p-4 shrink-0">
           <TranscriptPanel messages={messages} />
         </div>
       </div>

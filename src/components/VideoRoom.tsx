@@ -139,6 +139,7 @@ export function VideoRoom({ token, roomName, onDisconnect, onAudioStream, childr
         playsInline
         muted
         className="w-full h-full object-cover bg-zinc-900 rounded-lg"
+        style={{ transform: "scaleX(-1)" }} // Un-mirror the selfie camera
       />
       
       {/* Connection status badge */}
