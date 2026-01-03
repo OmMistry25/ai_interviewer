@@ -29,6 +29,14 @@ export default async function InterviewsPage() {
     .eq("org_id", org.orgId)
     .not("interview_template_versions.published_at", "is", null);
 
+  // Get active job postings
+  const { data: jobPostings } = await supabase
+    .from("job_postings")
+    .select("id, title, template_id")
+    .eq("org_id", org.orgId)
+    .eq("status", "active")
+    .order("created_at", { ascending: false });
+
   // Get recent interviews
   const { data: interviews } = await supabase
     .from("interviews")
@@ -71,6 +79,13 @@ export default async function InterviewsPage() {
               templates?.map((t) => ({
                 id: t.id,
                 name: t.name,
+              })) || []
+            }
+            jobPostings={
+              jobPostings?.map((j) => ({
+                id: j.id,
+                title: j.title,
+                templateId: j.template_id,
               })) || []
             }
           />

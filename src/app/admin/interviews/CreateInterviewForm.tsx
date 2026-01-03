@@ -8,9 +8,11 @@ import { CheckCircle, Copy, AlertCircle } from "lucide-react";
 
 interface Props {
   templates: { id: string; name: string }[];
+  jobPostings: { id: string; title: string; templateId: string | null }[];
 }
 
-export function CreateInterviewForm({ templates }: Props) {
+export function CreateInterviewForm({ templates, jobPostings }: Props) {
+  const [selectedJobId, setSelectedJobId] = useState("");
   const [result, setResult] = useState<{
     success?: boolean;
     token?: string;
@@ -74,8 +76,23 @@ export function CreateInterviewForm({ templates }: Props) {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Select name="templateId" label="Template" required>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Select 
+          name="jobId" 
+          label="Job Posting" 
+          required
+          value={selectedJobId}
+          onChange={(e) => setSelectedJobId(e.target.value)}
+        >
+          <option value="">Select job posting...</option>
+          {jobPostings.map((j) => (
+            <option key={j.id} value={j.id}>
+              {j.title}
+            </option>
+          ))}
+        </Select>
+
+        <Select name="templateId" label="Interview Template" required>
           <option value="">Select template...</option>
           {templates.map((t) => (
             <option key={t.id} value={t.id}>
@@ -83,7 +100,9 @@ export function CreateInterviewForm({ templates }: Props) {
             </option>
           ))}
         </Select>
+      </div>
 
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Input
           type="text"
           name="candidateName"
@@ -104,13 +123,20 @@ export function CreateInterviewForm({ templates }: Props) {
       <div className="flex items-center gap-4">
         <Button
           type="submit"
-          disabled={loading || templates.length === 0}
+          disabled={loading || templates.length === 0 || jobPostings.length === 0}
           variant="primary"
         >
           {loading ? "Creating..." : "Create Interview"}
         </Button>
 
-        {templates.length === 0 && (
+        {jobPostings.length === 0 && (
+          <p className="text-amber-400 text-sm flex items-center gap-2">
+            <AlertCircle className="w-4 h-4" />
+            No active job postings. Create a job posting first.
+          </p>
+        )}
+        
+        {templates.length === 0 && jobPostings.length > 0 && (
           <p className="text-amber-400 text-sm flex items-center gap-2">
             <AlertCircle className="w-4 h-4" />
             No published templates. Create and publish a template first.
