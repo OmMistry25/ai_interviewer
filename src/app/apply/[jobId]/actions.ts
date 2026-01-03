@@ -78,8 +78,9 @@ export async function submitApplication(
     candidateId = newCandidate.id;
   }
 
-  // Generate schedule token
+  // Generate tokens
   const scheduleToken = crypto.randomBytes(32).toString("hex");
+  const interviewToken = crypto.randomBytes(32).toString("hex");
 
   // Create application
   const { data: application, error: appError } = await admin
@@ -88,7 +89,7 @@ export async function submitApplication(
       job_id: jobId,
       candidate_id: candidateId,
       schedule_token: scheduleToken,
-      status: "applied",
+      status: "scheduled", // Now scheduled since we're creating interview immediately
     })
     .select()
     .single();
@@ -98,45 +99,88 @@ export async function submitApplication(
     return { success: false, error: "Failed to submit application" };
   }
 
-  // Send scheduling email in background
-  sendSchedulingEmail(application.id, parsed.data, job).catch(console.error);
+  // Create interview immediately and send interview link
+  createInterviewAndSendEmail(
+    application.id,
+    candidateId,
+    parsed.data,
+    job,
+    interviewToken
+  ).catch(console.error);
 
   return { success: true, applicationId: application.id };
 }
 
-async function sendSchedulingEmail(
+async function createInterviewAndSendEmail(
   applicationId: string,
+  candidateId: string,
   candidate: { first_name: string; last_name: string; email: string },
-  job: { title: string; org_id: string }
+  job: { id: string; title: string; org_id: string },
+  interviewToken: string
 ) {
-  const { sendApplicationReceivedEmail } = await import("@/lib/email/templates");
+  const { sendInterviewInviteEmail } = await import("@/lib/email/templates");
   const admin = createSupabaseAdminClient();
 
-  // Get org name
+  // Get org and job posting with template
   const { data: org } = await admin
     .from("organizations")
     .select("name")
     .eq("id", job.org_id)
     .single();
 
-  // Get schedule token
-  const { data: app } = await admin
-    .from("applications")
-    .select("schedule_token")
-    .eq("id", applicationId)
+  // Get the job's template
+  const { data: jobPosting } = await admin
+    .from("job_postings")
+    .select("template_id")
+    .eq("id", job.id)
     .single();
 
-  if (!app?.schedule_token) return;
+  if (!jobPosting?.template_id) {
+    console.error("Job has no template assigned");
+    return;
+  }
 
+  // Get published template version
+  const { data: version } = await admin
+    .from("interview_template_versions")
+    .select("id")
+    .eq("template_id", jobPosting.template_id)
+    .not("published_at", "is", null)
+    .single();
+
+  if (!version) {
+    console.error("No published template version found");
+    return;
+  }
+
+  // Create the interview
+  const { error: interviewError } = await admin
+    .from("interviews")
+    .insert({
+      org_id: job.org_id,
+      template_version_id: version.id,
+      candidate_name: `${candidate.first_name} ${candidate.last_name}`.trim(),
+      candidate_email: candidate.email,
+      access_token: interviewToken,
+      status: "scheduled",
+      application_id: applicationId,
+    });
+
+  if (interviewError) {
+    console.error("Interview creation error:", interviewError);
+    return;
+  }
+
+  // Send interview link email
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-  const scheduleUrl = `${baseUrl}/schedule/${applicationId}/${app.schedule_token}`;
+  const interviewUrl = `${baseUrl}/candidate/interview/${interviewToken}`;
 
-  await sendApplicationReceivedEmail({
+  await sendInterviewInviteEmail({
     to: candidate.email,
     candidateName: candidate.first_name,
     jobTitle: job.title,
     companyName: org?.name || "Company",
-    scheduleUrl,
+    interviewUrl,
   });
 }
 

@@ -122,6 +122,14 @@ export async function createInterview(formData: FormData) {
     return { error: "Failed to create interview: " + (interviewError?.message || "Unknown error") };
   }
 
+  // Send interview link email to candidate
+  sendInterviewEmail(
+    candidateEmail,
+    candidateName,
+    jobId,
+    interview.access_token
+  ).catch(console.error);
+
   revalidatePath("/admin/interviews");
   revalidatePath("/admin/candidates");
   
@@ -130,4 +138,35 @@ export async function createInterview(formData: FormData) {
     interviewId: interview.id,
     token: interview.access_token,
   };
+}
+
+async function sendInterviewEmail(
+  email: string,
+  name: string,
+  jobId: string,
+  token: string
+) {
+  const { sendInterviewInviteEmail } = await import("@/lib/email/templates");
+  const adminClient = createSupabaseAdminClient();
+
+  // Get job and org info
+  const { data: job } = await adminClient
+    .from("job_postings")
+    .select("title, organizations(name)")
+    .eq("id", jobId)
+    .single();
+
+  if (!job) return;
+
+  const orgData = job.organizations as unknown as { name: string } | null;
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const interviewUrl = `${baseUrl}/candidate/interview/${token}`;
+
+  await sendInterviewInviteEmail({
+    to: email,
+    candidateName: name.split(" ")[0] || name,
+    jobTitle: job.title,
+    companyName: orgData?.name || "Company",
+    interviewUrl,
+  });
 }

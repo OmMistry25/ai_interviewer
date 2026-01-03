@@ -12,7 +12,52 @@ const styles = {
 };
 
 /**
- * Send application received confirmation
+ * Send interview invitation with direct interview link
+ */
+export async function sendInterviewInviteEmail(params: {
+  to: string;
+  candidateName: string;
+  jobTitle: string;
+  companyName: string;
+  interviewUrl: string;
+}) {
+  const html = `
+    <div style="${styles.container}">
+      <div style="${styles.header}">
+        <h1 style="margin: 0; font-size: 24px;">You're Invited to Interview!</h1>
+      </div>
+      <div style="${styles.body}">
+        <p>Hi ${params.candidateName},</p>
+        <p>Thank you for your interest in the <strong>${params.jobTitle}</strong> position at <strong>${params.companyName}</strong>.</p>
+        <p>We'd love to learn more about you! Please complete a brief AI-powered video interview at your convenience.</p>
+        <div style="text-align: center;">
+          <a href="${params.interviewUrl}" style="${styles.button}">Start Interview</a>
+        </div>
+        <div style="background: white; padding: 20px; border-radius: 8px; margin: 20px 0;">
+          <p style="margin: 0 0 10px 0; font-weight: 600; color: #1e293b;">Before you begin:</p>
+          <ul style="margin: 0; padding-left: 20px; color: #475569;">
+            <li>Find a quiet, well-lit space</li>
+            <li>Make sure your camera and microphone work</li>
+            <li>The interview takes about 10-15 minutes</li>
+            <li>You can use your phone or computer</li>
+          </ul>
+        </div>
+        <p style="color: #64748b; font-size: 14px;">This link is unique to you and can be used anytime.</p>
+        <p>Best of luck!</p>
+        <p style="${styles.footer}">${params.companyName}</p>
+      </div>
+    </div>
+  `;
+
+  return sendEmail({
+    to: params.to,
+    subject: `Interview Invitation: ${params.jobTitle} at ${params.companyName}`,
+    html,
+  });
+}
+
+/**
+ * Send application received confirmation (legacy - redirects to schedule)
  */
 export async function sendApplicationReceivedEmail(params: {
   to: string;
