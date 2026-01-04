@@ -4,14 +4,16 @@
  * making the AI feel responsive while processing happens in the background
  */
 
-// Filler phrases - short, natural acknowledgments
+// Filler phrases - warm, enthusiastic acknowledgments
 const FILLER_PHRASES = [
-  "Mmhmm...",
-  "I see...",
-  "Interesting...",
-  "Got it...",
-  "Okay...",
-  "Right...",
+  "That's great!",
+  "Interesting!",
+  "I really appreciate that.",
+  "That's helpful, thank you.",
+  "Okay, great!",
+  "Got it, thanks!",
+  "That makes sense!",
+  "Wonderful!",
 ];
 
 // Cache for generated filler audio (base64)

@@ -3,6 +3,10 @@ import { TemplateConfig, Question, getInterviewMode } from "@/types/template";
 import { ResumeContext } from "./evaluator";
 import { ConversationTurn } from "./question-generator";
 import { FitStatus } from "./fit-assessor";
+import OpenAI from "openai";
+import { env } from "@/lib/env";
+
+const openai = new OpenAI({ apiKey: env.OPENAI_API_KEY });
 
 // Interview phase for dynamic mode
 export type InterviewPhase = "screening" | "dynamic" | "exit";
@@ -247,6 +251,13 @@ export async function startInterview(interviewId: string): Promise<void> {
 export async function completeInterview(interviewId: string): Promise<void> {
   const adminClient = createSupabaseAdminClient();
 
+  // Get interview to check mode and dynamic state
+  const { data: interviewData } = await adminClient
+    .from("interviews")
+    .select("template_version_id, dynamic_state")
+    .eq("id", interviewId)
+    .single();
+
   // Get transcript from interview_turns
   const { data: turns } = await adminClient
     .from("interview_turns")
@@ -260,14 +271,30 @@ export async function completeInterview(interviewId: string): Promise<void> {
     content: turn.transcript,
   }));
 
-  // Get scores from evaluations
-  const { data: evaluation } = await adminClient
+  // Get scores from evaluations (for static mode)
+  let { data: evaluation } = await adminClient
     .from("evaluations")
     .select("scores")
     .eq("interview_id", interviewId)
     .single();
 
-  const scores = evaluation?.scores || null;
+  let scores = evaluation?.scores || null;
+
+  // For dynamic mode: Generate scores if not already present
+  const dynamicState = interviewData?.dynamic_state as { conversationHistory?: ConversationTurn[] } | null;
+  if (!scores && dynamicState?.conversationHistory && dynamicState.conversationHistory.length > 0) {
+    try {
+      scores = await generateDynamicScores(dynamicState.conversationHistory);
+      
+      // Save to evaluations table
+      await adminClient.from("evaluations").upsert(
+        { interview_id: interviewId, scores },
+        { onConflict: "interview_id" }
+      );
+    } catch (e) {
+      console.error("Failed to generate dynamic scores:", e);
+    }
+  }
 
   // Generate a simple summary from the scores
   let summary: string | null = null;
@@ -352,5 +379,90 @@ export async function loadResumeContext(
     strengths: analysis.strengths,
     concerns: analysis.concerns,
   };
+}
+
+/**
+ * Generate interview scores for dynamic mode interviews
+ * Analyzes conversation history to produce signal-based scores
+ */
+async function generateDynamicScores(
+  conversationHistory: ConversationTurn[]
+): Promise<{
+  totalScore: number;
+  signals: Record<string, { score: number; weight: number }>;
+}> {
+  const conversationText = conversationHistory
+    .map((turn) => `Q: ${turn.question}\nA: ${turn.answer}`)
+    .join("\n\n");
+
+  const prompt = `Evaluate this interview conversation and score the candidate on these signals (0.0 to 1.0):
+
+Conversation:
+${conversationText}
+
+Score these signals:
+1. communication (clarity, articulation, listening skills)
+2. enthusiasm (energy, interest in role, positive attitude)
+3. relevant_experience (applicable skills, transferable experience)
+4. problem_solving (analytical thinking, examples of solving issues)
+5. cultural_fit (team orientation, values alignment, professionalism)
+
+Be generous - look for positives. Score based on what was demonstrated, not what was missing.
+
+Respond with JSON only:
+{"communication": 0.X, "enthusiasm": 0.X, "relevant_experience": 0.X, "problem_solving": 0.X, "cultural_fit": 0.X}`;
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: "You are a fair and generous interview evaluator. Score generously. Respond with JSON only." },
+        { role: "user", content: prompt },
+      ],
+      max_tokens: 150,
+      temperature: 0.3,
+    });
+
+    const content = response.choices[0]?.message?.content?.trim() || "{}";
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new Error("No JSON in response");
+    }
+
+    const rawScores = JSON.parse(jsonMatch[0]) as Record<string, number>;
+    
+    // Build signals with equal weights
+    const signals: Record<string, { score: number; weight: number }> = {};
+    const signalNames = ["communication", "enthusiasm", "relevant_experience", "problem_solving", "cultural_fit"];
+    
+    let totalWeighted = 0;
+    let totalWeight = 0;
+    
+    for (const name of signalNames) {
+      const score = typeof rawScores[name] === "number" 
+        ? Math.min(1, Math.max(0, rawScores[name])) 
+        : 0.5;
+      signals[name] = { score, weight: 0.2 };
+      totalWeighted += score * 0.2;
+      totalWeight += 0.2;
+    }
+
+    const totalScore = totalWeight > 0 ? totalWeighted / totalWeight : 0.5;
+
+    return { totalScore, signals };
+  } catch (e) {
+    console.error("Failed to generate dynamic scores:", e);
+    // Return neutral scores on error
+    return {
+      totalScore: 0.5,
+      signals: {
+        communication: { score: 0.5, weight: 0.2 },
+        enthusiasm: { score: 0.5, weight: 0.2 },
+        relevant_experience: { score: 0.5, weight: 0.2 },
+        problem_solving: { score: 0.5, weight: 0.2 },
+        cultural_fit: { score: 0.5, weight: 0.2 },
+      },
+    };
+  }
 }
 

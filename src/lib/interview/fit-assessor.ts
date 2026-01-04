@@ -50,14 +50,18 @@ ${conversationSummary}
 
 Based on the conversation, assess if this candidate is a fit.
 
-Rules:
-- "fit": Shows relevant experience/skills, positive signals, good potential
-- "uncertain": Mixed signals, need more information
-- "not_fit": Clear mismatch (e.g., no relevant experience AND no transferable skills, wrong expectations)
+IMPORTANT - Be generous and encouraging:
+- "fit": Shows ANY relevant experience, transferable skills, enthusiasm, willingness to learn, or positive attitude
+- "uncertain": Mixed signals but showing effort or potential - default to this if unsure
+- "not_fit": ONLY use for extreme cases - candidate explicitly refuses job duties, is hostile, or shows zero interest
 
-Be fair - someone without direct experience can still be "fit" if they show transferable skills, enthusiasm, and learning potential.
+Key rules:
+1. Transferable skills count heavily (e.g., engineering skills apply to tech roles, retail experience applies to customer service)
+2. Enthusiasm and willingness to learn can compensate for lack of direct experience
+3. Give candidates the benefit of the doubt - we can train skills but not attitude
+4. Entry-level roles should NOT require experience
 
-Only mark "not_fit" if there are multiple clear red flags.
+NEVER mark "not_fit" just because someone lacks direct experience. Most great hires come from adjacent fields.
 
 Respond with JSON only:
 {"status": "fit|uncertain|not_fit", "reason": "brief reason (1 sentence)", "confidence": 0.0-1.0}`;
@@ -118,9 +122,11 @@ Respond with JSON only:
 
 /**
  * Determine if we should exit gracefully based on fit assessment
- * Requires high confidence and "not_fit" status
+ * Requires VERY high confidence and "not_fit" status
+ * This should rarely trigger - only for extreme mismatch cases
  */
 export function shouldExitGracefully(assessment: FitAssessment): boolean {
-  return assessment.status === "not_fit" && assessment.confidence >= 0.7;
+  // Require 90% confidence to exit early - we almost never want to do this
+  return assessment.status === "not_fit" && assessment.confidence >= 0.9;
 }
 
