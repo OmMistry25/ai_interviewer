@@ -24,8 +24,8 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { generateNextQuestion } from "@/lib/interview/question-generator";
 import { assessCandidateFit, shouldExitGracefully } from "@/lib/interview/fit-assessor";
 
-// Extend timeout for this route
-export const maxDuration = 30;
+// Extend timeout for this route (Vercel Pro: 60s max)
+export const maxDuration = 60;
 
 export async function POST(request: NextRequest) {
   try {

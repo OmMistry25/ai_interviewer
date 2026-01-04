@@ -8,6 +8,9 @@ import {
   updateDynamicState,
 } from "@/lib/interview/orchestrator";
 
+// Extend timeout (Vercel Pro: 60s max)
+export const maxDuration = 60;
+
 export async function POST(request: NextRequest) {
   try {
     const { interviewId } = await request.json();

@@ -3,8 +3,8 @@ import OpenAI from "openai";
 import { env } from "@/lib/env";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
-// Extend timeout for STT processing
-export const maxDuration = 30;
+// Extend timeout for STT processing (Vercel Pro: 60s max)
+export const maxDuration = 60;
 
 const openai = new OpenAI({
   apiKey: env.OPENAI_API_KEY,

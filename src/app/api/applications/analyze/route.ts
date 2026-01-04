@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { analyzeApplicationResume } from "@/lib/resume/parser";
 
+// Extend timeout for AI resume analysis (Vercel Pro: 60s max)
+export const maxDuration = 60;
+
 export async function POST(req: NextRequest) {
   try {
     const { applicationId } = await req.json();

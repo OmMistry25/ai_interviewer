@@ -3,8 +3,8 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { autoDecide } from "@/lib/interview/scoring";
 import { completeInterview } from "@/lib/interview/orchestrator";
 
-// Extend timeout for scoring
-export const maxDuration = 30;
+// Extend timeout for scoring (Vercel Pro: 60s max)
+export const maxDuration = 60;
 
 export async function POST(request: NextRequest) {
   try {
