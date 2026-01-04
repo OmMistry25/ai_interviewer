@@ -400,19 +400,39 @@ async function generateDynamicScores(
     .map((turn) => `Q: ${turn.question}\nA: ${turn.answer}`)
     .join("\n\n");
 
-  const prompt = `Evaluate this interview conversation and score the candidate on these signals (0.0 to 1.0):
+  const prompt = `Evaluate this interview conversation objectively. Score each signal from 0.0 to 1.0 based on evidence in the answers.
 
 Conversation:
 ${conversationText}
 
-Score these signals:
-1. communication (clarity, articulation, listening skills)
-2. enthusiasm (energy, interest in role, positive attitude)
-3. relevant_experience (applicable skills, transferable experience)
-4. problem_solving (analytical thinking, examples of solving issues)
-5. cultural_fit (team orientation, values alignment, professionalism)
+Score these signals based on ACTUAL evidence in responses:
 
-Be generous - look for positives. Score based on what was demonstrated, not what was missing.
+1. communication (0.0-1.0): Did they articulate clearly? Give detailed responses? Listen and respond appropriately?
+   - Low (0.1-0.3): One-word answers, unclear, doesn't address questions
+   - Medium (0.4-0.6): Adequate answers but lacks depth
+   - High (0.7-1.0): Clear, detailed, well-structured responses
+
+2. enthusiasm (0.0-1.0): Did they show genuine interest and energy?
+   - Low (0.1-0.3): Flat, minimal effort, disinterested tone
+   - Medium (0.4-0.6): Polite but not excited
+   - High (0.7-1.0): Genuine excitement, asks questions, shows passion
+
+3. relevant_experience (0.0-1.0): Did they demonstrate applicable skills or experience?
+   - Low (0.1-0.3): No relevant examples given
+   - Medium (0.4-0.6): Some transferable skills mentioned
+   - High (0.7-1.0): Strong, specific relevant examples
+
+4. problem_solving (0.0-1.0): Did they show analytical thinking with concrete examples?
+   - Low (0.1-0.3): Vague or no examples, can't explain approach
+   - Medium (0.4-0.6): Basic examples without depth
+   - High (0.7-1.0): Specific situations with clear problem-solving approach
+
+5. cultural_fit (0.0-1.0): Did they show professionalism, teamwork orientation?
+   - Low (0.1-0.3): Unprofessional responses, negative attitude
+   - Medium (0.4-0.6): Adequate professionalism
+   - High (0.7-1.0): Positive, team-oriented, professional throughout
+
+IMPORTANT: Score based on what was ACTUALLY demonstrated. Short, vague answers = low scores. "No" or refusal to answer = very low.
 
 Respond with JSON only:
 {"communication": 0.X, "enthusiasm": 0.X, "relevant_experience": 0.X, "problem_solving": 0.X, "cultural_fit": 0.X}`;
@@ -421,11 +441,11 @@ Respond with JSON only:
     const response = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
-        { role: "system", content: "You are a fair and generous interview evaluator. Score generously. Respond with JSON only." },
+        { role: "system", content: "You are an objective interview evaluator. Score based only on evidence in the conversation. Short or vague answers get low scores. Respond with JSON only." },
         { role: "user", content: prompt },
       ],
       max_tokens: 150,
-      temperature: 0.3,
+      temperature: 0.2,
     });
 
     const content = response.choices[0]?.message?.content?.trim() || "{}";
