@@ -22,9 +22,15 @@ export interface FinalScore {
 
 /**
  * Initialize score accumulator (Task 12.1)
+ * For static mode templates with questions array
  */
 export function initializeScores(config: TemplateConfig): ScoreAccumulator {
   const accumulator: ScoreAccumulator = {};
+
+  // Handle dynamic mode templates that don't have fixed questions
+  if (!config.questions) {
+    return accumulator;
+  }
 
   for (const question of config.questions) {
     if (question.rubric) {
