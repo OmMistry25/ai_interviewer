@@ -179,12 +179,16 @@ export function InterviewRoom({ interviewToken, candidateName }: InterviewRoomPr
           "Thank you for completing the interview. We will be in touch soon."
         );
 
-        // Finalize scoring
-        await fetch("/api/interviews/end", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ interviewId: creds.interviewId }),
-        });
+        // Finalize scoring - wrap in try-catch to ensure completion flow continues
+        try {
+          await fetch("/api/interviews/end", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ interviewId: creds.interviewId }),
+          });
+        } catch (e) {
+          console.error("End interview API error (continuing):", e);
+        }
 
         setPhase("completed");
         isProcessingRef.current = false;
