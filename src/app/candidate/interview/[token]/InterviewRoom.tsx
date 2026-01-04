@@ -196,16 +196,18 @@ export function InterviewRoom({ interviewToken, candidateName }: InterviewRoomPr
       }
 
       if (nextData.action === "followup") {
-        setFollowupsUsed(nextData.followupsUsed);
-        addMessage("interviewer", nextData.prompt);
+        setFollowupsUsed(nextData.followupsUsed || 1);
+        // Handle both static mode (prompt directly) and hybrid mode (question object)
+        const followUpPrompt = nextData.question?.prompt || nextData.prompt;
+        addMessage("interviewer", followUpPrompt);
 
         // Disable detection while AI speaks follow-up
         audioCaptureRef.current?.disableDetection();
         setPhase("ai_speaking");
         
-        await safeSpeakText(nextData.prompt, {
+        await safeSpeakText(followUpPrompt, {
           interviewId: creds.interviewId,
-          questionId: currentQuestionRef.current?.id,
+          questionId: nextData.question?.id || currentQuestionRef.current?.id,
         });
 
         // Enable detection after follow-up is complete

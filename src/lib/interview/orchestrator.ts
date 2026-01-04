@@ -19,14 +19,16 @@ export interface InterviewState {
   currentQuestionIndex: number;
   currentFollowupIndex: number;
   status: "scheduled" | "live" | "completed";
-  // Dynamic mode fields
-  mode: "static" | "dynamic";
+  // Mode: static (fixed), hybrid (fixed Q + AI follow-ups), dynamic (all AI)
+  mode: "static" | "hybrid" | "dynamic";
   phase?: InterviewPhase;
   conversationHistory?: ConversationTurn[];
   questionsAsked?: number;
   exitQuestionsAsked?: number;
   windingDownQuestionsAsked?: number; // Track questions in winding_down phase
   fitStatus?: FitStatus;
+  // Hybrid mode: track if we just asked a follow-up for current question
+  askedFollowUp?: boolean;
 }
 
 /**
@@ -75,7 +77,14 @@ export async function loadInterviewState(
     exitQuestionsAsked?: number;
     windingDownQuestionsAsked?: number;
     fitStatus?: FitStatus;
+    currentQuestionIndex?: number;
+    askedFollowUp?: boolean;
   } | null;
+
+  // For hybrid mode, get currentQuestionIndex from dynamic state
+  if (mode === "hybrid" && dynamicState?.currentQuestionIndex !== undefined) {
+    currentQuestionIndex = dynamicState.currentQuestionIndex;
+  }
 
   return {
     interviewId: interview.id,
@@ -91,6 +100,7 @@ export async function loadInterviewState(
     exitQuestionsAsked: dynamicState?.exitQuestionsAsked || 0,
     windingDownQuestionsAsked: dynamicState?.windingDownQuestionsAsked || 0,
     fitStatus: dynamicState?.fitStatus,
+    askedFollowUp: dynamicState?.askedFollowUp || false,
   };
 }
 
@@ -183,6 +193,8 @@ export async function updateDynamicState(
     exitQuestionsAsked?: number;
     windingDownQuestionsAsked?: number;
     fitStatus?: FitStatus;
+    currentQuestionIndex?: number;
+    askedFollowUp?: boolean;
   }
 ): Promise<void> {
   const adminClient = createSupabaseAdminClient();

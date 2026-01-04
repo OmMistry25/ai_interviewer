@@ -21,7 +21,14 @@ import {
   ResumeContext,
 } from "@/lib/interview/evaluator";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { generateNextQuestion, getWindingDownQuestion, getFinalClosingQuestion } from "@/lib/interview/question-generator";
+import { 
+  generateNextQuestion, 
+  getWindingDownQuestion, 
+  getFinalClosingQuestion,
+  shouldAskFollowUp,
+  generateFollowUpQuestion,
+  ConversationTurn,
+} from "@/lib/interview/question-generator";
 import { assessCandidateFit, shouldExitGracefully } from "@/lib/interview/fit-assessor";
 
 // Extend timeout for this route (Vercel Pro: 60s max)
@@ -61,6 +68,8 @@ export async function POST(request: NextRequest) {
     // Branch based on interview mode
     if (state.mode === "dynamic") {
       return handleDynamicFlow(state, candidateAnswer, resumeContext, currentQuestionPrompt);
+    } else if (state.mode === "hybrid") {
+      return handleHybridFlow(state, candidateAnswer, resumeContext, currentQuestionPrompt);
     } else {
       return handleStaticFlow(state, candidateAnswer, resumeContext, followupsUsed);
     }
@@ -357,6 +366,136 @@ async function handleDynamicFlow(
     },
     phase: nextPhase,
     fitStatus: fitAssessment.status,
+  });
+}
+
+// ============================================================
+// HYBRID MODE (Fixed Questions + AI Follow-ups)
+// ============================================================
+
+async function handleHybridFlow(
+  state: InterviewState,
+  candidateAnswer: string,
+  resumeContext: ResumeContext | undefined,
+  currentQuestionPrompt?: string
+) {
+  const config = state.config;
+  const questions = config.questions || [];
+  const currentIndex = state.currentQuestionIndex;
+  const askedFollowUp = state.askedFollowUp || false;
+  const conversationHistory = state.conversationHistory || [];
+  
+  // Get the current question
+  const currentQuestion = questions[currentIndex];
+  if (!currentQuestion) {
+    // No more questions - complete the interview
+    completeInterview(state.interviewId).catch(console.error);
+    return NextResponse.json({
+      action: "complete",
+      message: "Thank you for speaking with us today!",
+    });
+  }
+  
+  // Add this turn to conversation history
+  const questionPrompt = currentQuestionPrompt || currentQuestion.prompt;
+  const newHistory: ConversationTurn[] = [
+    ...conversationHistory,
+    { question: questionPrompt, answer: candidateAnswer },
+  ];
+  
+  // If we already asked a follow-up for this question, move to next main question
+  if (askedFollowUp) {
+    const nextIndex = currentIndex + 1;
+    
+    // Update state
+    await updateDynamicState(state.interviewId, {
+      currentQuestionIndex: nextIndex,
+      askedFollowUp: false,
+      conversationHistory: newHistory,
+    });
+    
+    // Check if there are more questions
+    const nextQuestion = questions[nextIndex];
+    if (!nextQuestion) {
+      completeInterview(state.interviewId).catch(console.error);
+      return NextResponse.json({
+        action: "complete",
+        message: "Thank you for speaking with us today!",
+      });
+    }
+    
+    return NextResponse.json({
+      action: "next_question",
+      question: {
+        id: nextQuestion.id,
+        prompt: nextQuestion.prompt,
+      },
+      questionIndex: nextIndex,
+      totalQuestions: questions.length,
+    });
+  }
+  
+  // Check if this question allows follow-ups
+  if (currentQuestion.allow_followup) {
+    // Decide if we should ask a follow-up
+    const { shouldFollowUp, reason } = await shouldAskFollowUp(
+      currentQuestion.prompt,
+      candidateAnswer,
+      config.role_context
+    );
+    
+    if (shouldFollowUp) {
+      // Generate a contextual follow-up
+      const followUp = await generateFollowUpQuestion(
+        currentQuestion.prompt,
+        candidateAnswer,
+        config.role_context
+      );
+      
+      // Update state - mark that we asked a follow-up
+      await updateDynamicState(state.interviewId, {
+        askedFollowUp: true,
+        conversationHistory: newHistory,
+      });
+      
+      return NextResponse.json({
+        action: "followup",
+        question: followUp,
+        reason,
+        questionIndex: currentIndex,
+        totalQuestions: questions.length,
+      });
+    }
+  }
+  
+  // No follow-up needed - move to next question
+  const nextIndex = currentIndex + 1;
+  
+  // Update state
+  await updateDynamicState(state.interviewId, {
+    currentQuestionIndex: nextIndex,
+    askedFollowUp: false,
+    conversationHistory: newHistory,
+  });
+  
+  // Check if there are more questions
+  const nextQuestion = questions[nextIndex];
+  if (!nextQuestion) {
+    completeInterview(state.interviewId).catch(console.error);
+    return NextResponse.json({
+      action: "complete",
+      message: "Thank you for speaking with us today!",
+    });
+  }
+  
+  return NextResponse.json({
+    action: "next_question",
+    question: {
+      id: nextQuestion.id,
+      prompt: nextQuestion.prompt,
+    },
+    questionIndex: nextIndex,
+    totalQuestions: questions.length,
   });
 }
 

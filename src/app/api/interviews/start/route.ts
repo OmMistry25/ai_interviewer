@@ -72,6 +72,38 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    if (state.mode === "hybrid") {
+      // Hybrid mode: fixed questions with AI follow-ups
+      const questions = state.config.questions || [];
+      const firstQuestion = questions[0];
+      
+      if (!firstQuestion) {
+        return NextResponse.json(
+          { error: "No questions in template" },
+          { status: 400 }
+        );
+      }
+
+      // Initialize hybrid state
+      await updateDynamicState(interviewId, {
+        currentQuestionIndex: 0,
+        askedFollowUp: false,
+        conversationHistory: [],
+      });
+
+      return NextResponse.json({
+        status: "started",
+        mode: "hybrid",
+        systemPrompt: state.config.system_prompt,
+        question: {
+          id: firstQuestion.id,
+          prompt: firstQuestion.prompt,
+        },
+        questionIndex: 0,
+        totalQuestions: questions.length,
+      });
+    }
+
     // Static mode (original): get first question from fixed array
     const firstQuestion = getCurrentQuestion(state);
     if (!firstQuestion) {

@@ -170,3 +170,113 @@ export function getFinalClosingQuestion(): GeneratedQuestion {
   };
 }
 
+/**
+ * Determine if a follow-up question is needed based on the answer
+ * Returns true if the answer was vague, incomplete, or interesting enough to explore
+ */
+export async function shouldAskFollowUp(
+  question: string,
+  answer: string,
+  roleContext: RoleContext | undefined
+): Promise<{ shouldFollowUp: boolean; reason: string }> {
+  // Quick heuristics first - skip AI call for obvious cases
+  const wordCount = answer.trim().split(/\s+/).length;
+  
+  // Very short answers (< 10 words) usually need follow-up
+  if (wordCount < 10) {
+    return { shouldFollowUp: true, reason: "Answer was very brief" };
+  }
+  
+  // Very detailed answers (> 80 words) probably don't need follow-up
+  if (wordCount > 80) {
+    return { shouldFollowUp: false, reason: "Answer was comprehensive" };
+  }
+  
+  // For medium-length answers, use AI to decide
+  const prompt = `Question: "${question}"
+Answer: "${answer}"
+
+Does this answer need a follow-up? Consider:
+- Was the answer vague or lacking specifics?
+- Did they mention something interesting worth exploring?
+- Would a follow-up help assess their fit better?
+
+Respond with JSON only: {"followUp": true/false, "reason": "brief reason"}`;
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: "Decide if interview follow-up is needed. JSON only." },
+        { role: "user", content: prompt },
+      ],
+      max_tokens: 50,
+      temperature: 0.2,
+    });
+
+    const content = response.choices[0]?.message?.content?.trim() || "{}";
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      return {
+        shouldFollowUp: parsed.followUp === true,
+        reason: parsed.reason || "AI decision",
+      };
+    }
+  } catch (e) {
+    console.error("Follow-up decision error:", e);
+  }
+
+  // Default: no follow-up for medium answers
+  return { shouldFollowUp: false, reason: "Default - answer was adequate" };
+}
+
+/**
+ * Generate a contextual follow-up question based on the answer
+ * Used in hybrid mode when allow_followup is true
+ */
+export async function generateFollowUpQuestion(
+  originalQuestion: string,
+  answer: string,
+  roleContext: RoleContext | undefined
+): Promise<GeneratedQuestion> {
+  const jobTitle = roleContext?.job_title || "the position";
+  
+  const prompt = `Original question: "${originalQuestion}"
+Candidate's answer: "${answer}"
+
+Generate ONE short follow-up question that:
+- Asks for more detail or a specific example
+- Helps assess their fit for ${jobTitle}
+- Is conversational and natural
+- Does NOT repeat what was already asked
+
+Just output the follow-up question, nothing else.`;
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: "Generate one short follow-up interview question. No preamble." },
+        { role: "user", content: prompt },
+      ],
+      max_tokens: 60,
+      temperature: 0.6,
+    });
+
+    const questionText = response.choices[0]?.message?.content?.trim() || 
+      "Can you give me a specific example of that?";
+
+    return {
+      prompt: questionText,
+      id: `followup_${Date.now()}`,
+    };
+  } catch (e) {
+    console.error("Follow-up generation error:", e);
+    return {
+      prompt: "Can you tell me more about that?",
+      id: `followup_${Date.now()}`,
+    };
+  }
+}
+

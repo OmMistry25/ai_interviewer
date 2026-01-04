@@ -12,12 +12,14 @@ const followupSchema = z.object({
   prompt: z.string().min(1),
 });
 
-// Interview question (used for static mode and screening/exit questions)
+// Interview question (used for static mode, hybrid mode, and screening/exit questions)
 const questionSchema = z.object({
   id: z.string().min(1),
   prompt: z.string().min(1),
   followups: z.array(followupSchema).optional().default([]),
   rubric: rubricSchema.optional(),
+  // Hybrid mode: allow AI to generate a contextual follow-up for this question
+  allow_followup: z.boolean().optional().default(false),
 });
 
 // Screening question for dynamic mode (simpler structure)
@@ -83,14 +85,20 @@ export const templateConfigSchema = z.object({
   }),
 }).refine(
   (data) => {
-    // Validation: Either questions (static) or screening_questions (dynamic) must be present
+    // Validation: Must have questions for static/hybrid OR screening_questions for dynamic
     if (data.dynamic_mode) {
+      // Hybrid mode: questions array with allow_followup
+      if (data.questions && data.questions.length >= 1) {
+        return true;
+      }
+      // Fully dynamic mode: screening_questions
       return data.screening_questions && data.screening_questions.length >= 1;
     }
+    // Static mode: questions array
     return data.questions && data.questions.length >= 1;
   },
   {
-    message: "Static mode requires 'questions' array. Dynamic mode requires 'screening_questions' array.",
+    message: "Static/Hybrid mode requires 'questions' array. Dynamic mode requires 'screening_questions' array.",
   }
 );
 
@@ -103,9 +111,19 @@ export type Rubric = z.infer<typeof rubricSchema>;
 export type Followup = z.infer<typeof followupSchema>;
 
 // Helper to determine interview mode
-export function getInterviewMode(config: TemplateConfig): "static" | "dynamic" {
-  if (config.dynamic_mode === true && config.screening_questions && config.screening_questions.length > 0) {
-    return "dynamic";
+// - "static": Fixed questions with predefined follow-ups
+// - "hybrid": Fixed main questions with AI-generated follow-ups (dynamic_mode + questions with allow_followup)
+// - "dynamic": Fully AI-generated questions (dynamic_mode + screening_questions)
+export function getInterviewMode(config: TemplateConfig): "static" | "hybrid" | "dynamic" {
+  if (config.dynamic_mode === true) {
+    // Check if using hybrid mode (questions array with allow_followup)
+    if (config.questions && config.questions.length > 0) {
+      return "hybrid";
+    }
+    // Fully dynamic mode (screening_questions)
+    if (config.screening_questions && config.screening_questions.length > 0) {
+      return "dynamic";
+    }
   }
   return "static";
 }
