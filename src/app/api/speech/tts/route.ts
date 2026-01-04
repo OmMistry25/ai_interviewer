@@ -12,7 +12,14 @@ const openai = new OpenAI({
 
 export async function POST(request: NextRequest) {
   try {
-    const { text, interviewId, questionId, stream = true } = await request.json();
+    const { 
+      text, 
+      interviewId, 
+      questionId, 
+      stream = true,
+      voice = "alloy",
+      speed = 1.0,
+    } = await request.json();
 
     if (!text) {
       return NextResponse.json(
@@ -38,9 +45,10 @@ export async function POST(request: NextRequest) {
     // Generate speech using OpenAI TTS with streaming
     const response = await openai.audio.speech.create({
       model: "tts-1", // Use tts-1 for speed (tts-1-hd for quality)
-      voice: "alloy",
+      voice: voice as "alloy" | "echo" | "fable" | "onyx" | "nova" | "shimmer",
       input: text,
       response_format: "mp3", // MP3 streams well
+      speed: Math.max(0.25, Math.min(4.0, speed)), // Clamp to valid range
     });
 
     // If streaming is requested, return the stream directly

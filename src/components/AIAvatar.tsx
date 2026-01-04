@@ -1,6 +1,6 @@
 "use client";
 
-import { Volume2, Mic, Loader } from "lucide-react";
+import { Volume2, Mic } from "lucide-react";
 
 interface AIAvatarProps {
   state: "idle" | "speaking" | "listening" | "thinking";
@@ -42,7 +42,7 @@ export function AIAvatar({ state, size = "md" }: AIAvatarProps) {
           : state === "listening" 
           ? "bg-gradient-to-br from-emerald-500/20 to-transparent"
           : state === "thinking"
-          ? "bg-gradient-to-br from-blue-500/20 to-transparent"
+          ? "bg-gradient-to-br from-purple-500/20 to-transparent"
           : "bg-transparent"
         }
       `} />
@@ -56,7 +56,7 @@ export function AIAvatar({ state, size = "md" }: AIAvatarProps) {
             : state === "listening" 
             ? "bg-emerald-500/20 text-emerald-400"
             : state === "thinking"
-            ? "bg-blue-500/20 text-blue-400"
+            ? "bg-purple-500/20 text-purple-400"
             : "bg-slate-700/50 text-slate-500"
           }
           flex items-center justify-center
@@ -67,7 +67,12 @@ export function AIAvatar({ state, size = "md" }: AIAvatarProps) {
           ) : state === "listening" ? (
             <Mic className={iconSizes[size]} />
           ) : state === "thinking" ? (
-            <Loader className={`${iconSizes[size]} animate-spin`} />
+            // Subtle thinking animation - 3 dots that pulse
+            <div className="flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-bounce" style={{ animationDelay: "0ms" }} />
+              <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-bounce" style={{ animationDelay: "150ms" }} />
+              <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-bounce" style={{ animationDelay: "300ms" }} />
+            </div>
           ) : (
             <Volume2 className={iconSizes[size]} />
           )}
@@ -79,6 +84,11 @@ export function AIAvatar({ state, size = "md" }: AIAvatarProps) {
             <div className="absolute inset-0 rounded-xl border border-amber-400/30 animate-ping" />
           </>
         )}
+        
+        {/* Subtle glow for thinking */}
+        {state === "thinking" && (
+          <div className="absolute inset-0 rounded-xl bg-purple-500/10 animate-pulse" />
+        )}
       </div>
 
       {/* State label */}
@@ -89,13 +99,13 @@ export function AIAvatar({ state, size = "md" }: AIAvatarProps) {
           : state === "listening"
           ? "text-emerald-400"
           : state === "thinking"
-          ? "text-blue-400"
+          ? "text-purple-400"
           : "text-slate-600"
         }
       `}>
         {state === "speaking" && "Speaking"}
         {state === "listening" && "Listening"}
-        {state === "thinking" && "Processing"}
+        {state === "thinking" && "Thinking..."}
       </span>
     </div>
   );

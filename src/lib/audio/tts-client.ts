@@ -131,6 +131,9 @@ export async function speakText(
     
     options?.onStart?.();
 
+    // Calculate timeout based on text length (at least 10s, ~100ms per char max 60s)
+    const playbackTimeout = Math.min(60000, Math.max(10000, text.length * 100));
+
     // Try Web Audio API first (works on iOS Safari with pre-unlocked context)
     if (sharedAudioContext) {
       try {
@@ -150,7 +153,17 @@ export async function speakText(
         return new Promise<void>((resolve) => {
           currentResolve = resolve;
           
+          // Safety timeout to prevent stuck interviews
+          const timeout = setTimeout(() => {
+            console.warn("TTS playback timeout (Web Audio) - continuing");
+            options?.onEnd?.();
+            currentSource = null;
+            currentResolve = null;
+            resolve();
+          }, playbackTimeout);
+          
           source.onended = () => {
+            clearTimeout(timeout);
             options?.onEnd?.();
             currentSource = null;
             currentResolve = null;
@@ -173,7 +186,18 @@ export async function speakText(
     return new Promise((resolve, reject) => {
       currentResolve = resolve;
       
+      // Safety timeout to prevent stuck interviews
+      const timeout = setTimeout(() => {
+        console.warn("TTS playback timeout (HTML Audio) - continuing");
+        options?.onEnd?.();
+        URL.revokeObjectURL(audioUrl);
+        currentAudio = null;
+        currentResolve = null;
+        resolve();
+      }, playbackTimeout);
+      
       audio.onended = () => {
+        clearTimeout(timeout);
         options?.onEnd?.();
         URL.revokeObjectURL(audioUrl);
         currentAudio = null;
@@ -182,6 +206,7 @@ export async function speakText(
       };
       
       audio.onerror = (e) => {
+        clearTimeout(timeout);
         URL.revokeObjectURL(audioUrl);
         currentAudio = null;
         currentResolve = null;

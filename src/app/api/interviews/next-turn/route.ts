@@ -273,12 +273,13 @@ async function handleDynamicFlow(
   if (nextPhase === "dynamic" && !nextQuestion) {
     // Check if interview should complete (reached target questions)
     if (shouldCompleteInterview({ ...state, questionsAsked: newQuestionsAsked })) {
-      await updateDynamicState(state.interviewId, {
+      // Don't wait for fit assessment - update state in background
+      updateDynamicState(state.interviewId, {
         phase: "dynamic",
         fitStatus: fitAssessment.status,
         questionsAsked: newQuestionsAsked,
         conversationHistory,
-      });
+      }).catch(console.error);
 
       completeInterview(state.interviewId).catch(console.error);
 
@@ -289,7 +290,8 @@ async function handleDynamicFlow(
       });
     }
 
-    // Generate dynamic question
+    // OPTIMIZATION: Generate question immediately, don't wait for fit assessment
+    // Fit runs in parallel and we use current result (which started earlier)
     const totalTarget = config.role_context?.total_questions || 5;
     const remaining = totalTarget - newQuestionsAsked;
     
@@ -301,13 +303,13 @@ async function handleDynamicFlow(
     );
   }
 
-  // Update state
-  await updateDynamicState(state.interviewId, {
+  // OPTIMIZATION: Update state in background - don't block response
+  updateDynamicState(state.interviewId, {
     phase: nextPhase,
     fitStatus: fitAssessment.status,
     questionsAsked: newQuestionsAsked,
     conversationHistory,
-  });
+  }).catch(console.error);
 
   if (!nextQuestion) {
     // Fallback - shouldn't reach here

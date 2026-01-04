@@ -9,6 +9,7 @@ import { PauseIndicator } from "@/components/PauseIndicator";
 import { AudioCapture } from "@/lib/audio/capture";
 import { AudioBuffer } from "@/lib/audio/buffer";
 import { speakText, stopSpeaking, setAudioContext } from "@/lib/audio/tts-client";
+import { initializeFillers, playRandomFiller, setFillerAudioContext } from "@/lib/audio/fillers";
 
 interface InterviewRoomProps {
   interviewToken: string;
@@ -94,6 +95,9 @@ export function InterviewRoom({ interviewToken, candidateName }: InterviewRoomPr
     isProcessingRef.current = true;
     setPhase("processing");
     setPauseProgress(0);
+
+    // Play conversational filler immediately (non-blocking) for natural feel
+    playRandomFiller().catch(() => {}); // Fire and forget
 
     try {
       if (audioBufferRef.current.isEmpty()) {
@@ -362,13 +366,17 @@ export function InterviewRoom({ interviewToken, candidateName }: InterviewRoomPr
         if (audioContextRef.current.state === "suspended") {
           audioContextRef.current.resume();
         }
-        // Share with TTS client for iOS Safari audio playback
+        // Share with TTS client and filler audio for iOS Safari audio playback
         setAudioContext(audioContextRef.current);
-        console.log("AudioContext created, resumed, and shared with TTS client");
+        setFillerAudioContext(audioContextRef.current);
+        console.log("AudioContext created, resumed, and shared with TTS/filler clients");
       } catch (e) {
         console.error("Failed to create AudioContext:", e);
       }
     }
+    
+    // Pre-warm filler audio cache in background (for instant playback later)
+    initializeFillers().catch(() => {});
     
     // 2. Play silent audio to unlock HTML Audio API (for TTS playback)
     // IMPORTANT: Do NOT await this - keep it synchronous to preserve user gesture context

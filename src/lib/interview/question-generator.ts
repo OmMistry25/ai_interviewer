@@ -1,6 +1,7 @@
 /**
  * Dynamic question generator for AI-driven interviews
  * Generates contextual follow-up questions based on conversation history
+ * Optimized for speed with compact prompts and streaming
  */
 
 import OpenAI from "openai";
@@ -24,6 +25,7 @@ interface GeneratedQuestion {
 
 /**
  * Generate the next interview question dynamically based on conversation
+ * OPTIMIZED: Uses streaming to get first tokens faster
  */
 export async function generateNextQuestion(
   conversationHistory: ConversationTurn[],
@@ -33,56 +35,55 @@ export async function generateNextQuestion(
 ): Promise<GeneratedQuestion> {
   const jobTitle = roleContext?.job_title || "the position";
   const keySkills = roleContext?.key_skills || roleContext?.required_skills || [];
-  const idealCandidate = roleContext?.ideal_candidate || "";
   
-  // Build compact conversation summary
-  const conversationSummary = conversationHistory
-    .map((turn, i) => `Q${i + 1}: ${turn.question}\nA${i + 1}: ${turn.answer}`)
-    .join("\n\n");
+  // OPTIMIZATION: Compact conversation - only last 2-3 exchanges for context
+  const recentHistory = conversationHistory.slice(-3);
+  const conversationSummary = recentHistory
+    .map((turn) => `Q: ${turn.question.slice(0, 100)}\nA: ${turn.answer.slice(0, 200)}`)
+    .join("\n");
   
-  // Build resume context hint
-  let resumeHint = "";
-  if (resumeContext?.summary) {
-    resumeHint = `\nCandidate background: ${resumeContext.summary.slice(0, 150)}`;
-  }
+  // OPTIMIZATION: Minimal resume hint
+  const resumeHint = resumeContext?.summary 
+    ? `Background: ${resumeContext.summary.slice(0, 100)}` 
+    : "";
   
-  // Build the prompt
-  const prompt = `You are interviewing for: ${jobTitle}
-${keySkills.length > 0 ? `Key skills: ${keySkills.slice(0, 5).join(", ")}` : ""}
-${idealCandidate ? `Looking for: ${idealCandidate}` : ""}${resumeHint}
+  // OPTIMIZATION: Ultra-compact prompt (~150 tokens)
+  const prompt = `Role: ${jobTitle}${keySkills.length > 0 ? ` | Skills: ${keySkills.slice(0, 3).join(", ")}` : ""}
+${resumeHint}
 
-Conversation so far:
+Recent:
 ${conversationSummary}
 
-Generate the next interview question. You have ${questionsRemaining} questions remaining.
+Next question (${questionsRemaining} left). Build on their answer. Be conversational. Question only:`;
 
-Guidelines:
-- Build on what the candidate has shared
-- Explore gaps or interesting points from their answers
-- Keep it conversational and natural
-- Focus on skills/experience relevant to the role
-- Don't repeat topics already covered
-
-Respond with ONLY the question text, nothing else.`;
-
-  const response = await openai.chat.completions.create({
+  // Use streaming to get the response faster
+  const stream = await openai.chat.completions.create({
     model: "gpt-4o-mini",
     messages: [
       {
         role: "system",
-        content: "You are a professional interviewer. Generate concise, relevant interview questions.",
+        content: "Generate one short interview question. No preamble.",
       },
       {
         role: "user",
         content: prompt,
       },
     ],
-    max_tokens: 150,
+    max_tokens: 80, // Reduced - questions should be short
     temperature: 0.7,
+    stream: true,
   });
 
-  const questionText = response.choices[0]?.message?.content?.trim() || 
-    "Tell me more about your relevant experience for this role.";
+  // Collect streamed tokens
+  let questionText = "";
+  for await (const chunk of stream) {
+    const content = chunk.choices[0]?.delta?.content;
+    if (content) {
+      questionText += content;
+    }
+  }
+
+  questionText = questionText.trim() || "Tell me more about your experience.";
 
   return {
     prompt: questionText,
