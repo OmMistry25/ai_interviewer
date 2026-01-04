@@ -21,7 +21,7 @@ import {
   ResumeContext,
 } from "@/lib/interview/evaluator";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { generateNextQuestion } from "@/lib/interview/question-generator";
+import { generateNextQuestion, getWindingDownQuestion, getFinalClosingQuestion } from "@/lib/interview/question-generator";
 import { assessCandidateFit, shouldExitGracefully } from "@/lib/interview/fit-assessor";
 
 // Extend timeout for this route (Vercel Pro: 60s max)
@@ -177,6 +177,7 @@ async function handleDynamicFlow(
   const phase = state.phase || "screening";
   const questionsAsked = state.questionsAsked || 0;
   const exitQuestionsAsked = state.exitQuestionsAsked || 0;
+  const windingDownQuestionsAsked = state.windingDownQuestionsAsked || 0;
   const config = state.config;
   const jobTitle = config.role_context?.job_title || "the position";
   const fitCriteria = config.fit_criteria || "Relevant experience and skills for the role";
@@ -196,61 +197,89 @@ async function handleDynamicFlow(
   // Assess fit after each answer (runs in parallel with next question generation when possible)
   const fitAssessmentPromise = assessCandidateFit(conversationHistory, fitCriteria, jobTitle);
 
-  // Determine next action based on phase
-  if (phase === "exit") {
-    // In exit phase - just get next exit question or complete
-    const newExitAsked = exitQuestionsAsked + 1;
-    const nextExitQ = getExitQuestion({ ...state, exitQuestionsAsked: newExitAsked });
+  // Handle winding_down phase (gradual exit with 2 lighter questions + final closing)
+  if (phase === "winding_down") {
+    const newWindingDownAsked = windingDownQuestionsAsked + 1;
+    
+    // Check if we've asked 2 winding down questions already
+    if (newWindingDownAsked >= 2) {
+      // Ask final closing question, then complete
+      const closingQ = getFinalClosingQuestion();
+      
+      await updateDynamicState(state.interviewId, {
+        phase: "exit", // Move to exit for final question
+        questionsAsked: newQuestionsAsked,
+        windingDownQuestionsAsked: newWindingDownAsked,
+        exitQuestionsAsked: 0,
+        conversationHistory,
+      });
+      
+      return NextResponse.json({
+        action: "next_question",
+        question: closingQ,
+        phase: "exit",
+      });
+    }
+    
+    // Get next winding down question
+    const nextWindingQ = getWindingDownQuestion(newWindingDownAsked);
+    
+    await updateDynamicState(state.interviewId, {
+      phase: "winding_down",
+      questionsAsked: newQuestionsAsked,
+      windingDownQuestionsAsked: newWindingDownAsked,
+      conversationHistory,
+    });
+    
+    if (nextWindingQ) {
+      return NextResponse.json({
+        action: "next_question",
+        question: nextWindingQ,
+        phase: "winding_down",
+      });
+    }
+  }
 
+  // Handle exit phase (final closing only)
+  if (phase === "exit") {
+    // In exit phase - just complete the interview
     await updateDynamicState(state.interviewId, {
       phase: "exit",
       questionsAsked: newQuestionsAsked,
-      exitQuestionsAsked: newExitAsked,
+      exitQuestionsAsked: exitQuestionsAsked + 1,
       conversationHistory,
     });
 
-    if (!nextExitQ) {
-      completeInterview(state.interviewId).catch(console.error);
-      return NextResponse.json({
-        action: "complete",
-        message: "Thank you for your time today! We appreciate you speaking with us.",
-      });
-    }
-
+    completeInterview(state.interviewId).catch(console.error);
     return NextResponse.json({
-      action: "next_question",
-      question: {
-        id: nextExitQ.id,
-        prompt: nextExitQ.prompt,
-      },
-      phase: "exit",
+      action: "complete",
+      message: "Thank you for your time today! We really appreciate you speaking with us.",
     });
   }
 
   // Wait for fit assessment
   const fitAssessment = await fitAssessmentPromise;
 
-  // Check if we should exit gracefully
+  // Check if we should start winding down (gradual exit instead of abrupt)
   if (shouldExitGracefully(fitAssessment)) {
-    // Switch to exit phase
+    // Start winding_down phase - ask 2 more lighter questions first
+    const firstWindingQ = getWindingDownQuestion(0);
+    
     await updateDynamicState(state.interviewId, {
-      phase: "exit",
+      phase: "winding_down",
       fitStatus: fitAssessment.status,
       questionsAsked: newQuestionsAsked,
-      exitQuestionsAsked: 0,
+      windingDownQuestionsAsked: 0,
       conversationHistory,
     });
-
-    const exitQ = getExitQuestion({ ...state, exitQuestionsAsked: 0 });
     
     return NextResponse.json({
       action: "next_question",
-      question: {
-        id: exitQ?.id || "exit_1",
-        prompt: exitQ?.prompt || "What interests you most about working in this role?",
+      question: firstWindingQ || {
+        id: "wd_fallback",
+        prompt: "What are you hoping to learn or achieve in your next role?",
       },
-      phase: "exit",
-      fitStatus: fitAssessment.status,
+      phase: "winding_down",
     });
   }
 

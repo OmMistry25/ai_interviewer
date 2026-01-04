@@ -9,7 +9,8 @@ import { env } from "@/lib/env";
 const openai = new OpenAI({ apiKey: env.OPENAI_API_KEY });
 
 // Interview phase for dynamic mode
-export type InterviewPhase = "screening" | "dynamic" | "exit";
+// "winding_down" = gradual exit, asking 2 more light questions before ending
+export type InterviewPhase = "screening" | "dynamic" | "winding_down" | "exit";
 
 // Base interview state (shared between modes)
 export interface InterviewState {
@@ -24,6 +25,7 @@ export interface InterviewState {
   conversationHistory?: ConversationTurn[];
   questionsAsked?: number;
   exitQuestionsAsked?: number;
+  windingDownQuestionsAsked?: number; // Track questions in winding_down phase
   fitStatus?: FitStatus;
 }
 
@@ -71,6 +73,7 @@ export async function loadInterviewState(
     conversationHistory?: ConversationTurn[];
     questionsAsked?: number;
     exitQuestionsAsked?: number;
+    windingDownQuestionsAsked?: number;
     fitStatus?: FitStatus;
   } | null;
 
@@ -86,6 +89,7 @@ export async function loadInterviewState(
     conversationHistory: dynamicState?.conversationHistory || [],
     questionsAsked: dynamicState?.questionsAsked || 0,
     exitQuestionsAsked: dynamicState?.exitQuestionsAsked || 0,
+    windingDownQuestionsAsked: dynamicState?.windingDownQuestionsAsked || 0,
     fitStatus: dynamicState?.fitStatus,
   };
 }

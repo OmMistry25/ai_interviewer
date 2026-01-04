@@ -116,3 +116,57 @@ export async function generateClosingQuestion(
   };
 }
 
+/**
+ * Winding down questions - lighter, more conversational
+ * Used when we want to gracefully shorten the interview without being abrupt
+ */
+const WINDING_DOWN_QUESTIONS = [
+  {
+    id: "wd_goals",
+    prompt: "What are you hoping to learn or achieve in your next role?",
+  },
+  {
+    id: "wd_strengths",
+    prompt: "What do you consider your biggest strength?",
+  },
+  {
+    id: "wd_teamwork",
+    prompt: "Can you tell me about a time you worked well in a team?",
+  },
+  {
+    id: "wd_challenges",
+    prompt: "What's a challenge you've overcome that you're proud of?",
+  },
+  {
+    id: "wd_interest",
+    prompt: "What drew you to apply for this position?",
+  },
+];
+
+/**
+ * Get a winding down question (lighter, more general questions)
+ * These are used before final exit to make the interview feel complete
+ */
+export function getWindingDownQuestion(
+  windingDownQuestionsAsked: number
+): GeneratedQuestion | null {
+  // Only ask 2 winding down questions
+  if (windingDownQuestionsAsked >= 2) {
+    return null;
+  }
+  
+  // Pick questions in order, wrapping if needed
+  const question = WINDING_DOWN_QUESTIONS[windingDownQuestionsAsked % WINDING_DOWN_QUESTIONS.length];
+  return question;
+}
+
+/**
+ * Generic closing statement question
+ */
+export function getFinalClosingQuestion(): GeneratedQuestion {
+  return {
+    id: "final_closing",
+    prompt: "Is there anything else you'd like us to know about you before we wrap up?",
+  };
+}
+

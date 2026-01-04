@@ -52,7 +52,7 @@ export async function initializeFillers(): Promise<void> {
                 text: phrase,
                 stream: false,
                 voice: "alloy", // Use a consistent voice
-                speed: 1.1, // Slightly faster for natural feel
+                speed: 0.92, // Natural, relaxed pace - not rushed
               }),
             });
 
