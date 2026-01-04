@@ -4,6 +4,8 @@ import {
   getCurrentQuestion,
   startInterview,
   updateCurrentQuestion,
+  getNextScreeningQuestion,
+  updateDynamicState,
 } from "@/lib/interview/orchestrator";
 
 export async function POST(request: NextRequest) {
@@ -35,7 +37,39 @@ export async function POST(request: NextRequest) {
     // Mark as live
     await startInterview(interviewId);
 
-    // Get first question
+    // Branch based on interview mode
+    if (state.mode === "dynamic") {
+      // Dynamic mode: get first screening question
+      const firstScreeningQ = getNextScreeningQuestion(state);
+      
+      if (!firstScreeningQ) {
+        return NextResponse.json(
+          { error: "No screening questions in template" },
+          { status: 400 }
+        );
+      }
+
+      // Initialize dynamic state
+      await updateDynamicState(interviewId, {
+        phase: "screening",
+        conversationHistory: [],
+        questionsAsked: 0,
+        exitQuestionsAsked: 0,
+      });
+
+      return NextResponse.json({
+        status: "started",
+        mode: "dynamic",
+        systemPrompt: state.config.system_prompt,
+        question: {
+          id: firstScreeningQ.id,
+          prompt: firstScreeningQ.prompt,
+        },
+        phase: "screening",
+      });
+    }
+
+    // Static mode (original): get first question from fixed array
     const firstQuestion = getCurrentQuestion(state);
     if (!firstQuestion) {
       return NextResponse.json(
@@ -49,13 +83,14 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       status: "started",
+      mode: "static",
       systemPrompt: state.config.system_prompt,
       question: {
         id: firstQuestion.id,
         prompt: firstQuestion.prompt,
       },
       questionIndex: 0,
-      totalQuestions: state.config.questions.length,
+      totalQuestions: state.config.questions?.length || 0,
     });
   } catch (error) {
     console.error("Start interview error:", error);

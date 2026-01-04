@@ -150,6 +150,7 @@ export function InterviewRoom({ interviewToken, candidateName }: InterviewRoomPr
             interviewId: creds.interviewId,
             candidateAnswer,
             followupsUsed: followupsUsedRef.current,
+            currentQuestionPrompt: currentQuestionRef.current?.prompt, // For dynamic mode conversation history
           }),
         });
         nextData = await nextRes.json();
@@ -506,9 +507,6 @@ export function InterviewRoom({ interviewToken, candidateName }: InterviewRoomPr
           <p className="text-xs md:text-sm text-zinc-500 hidden sm:block">Interview in progress</p>
         </div>
         <div className="flex items-center gap-2 md:gap-4 shrink-0">
-          <span className="text-xs md:text-sm text-zinc-400">
-            Q {(currentQuestion?.index ?? 0) + 1}/{currentQuestion?.total ?? "?"}
-          </span>
           <span
             className={`px-2 py-1 md:px-3 md:py-1.5 rounded-full text-xs font-medium whitespace-nowrap ${
               phase === "ai_speaking"
