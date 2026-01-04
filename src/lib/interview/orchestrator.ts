@@ -181,6 +181,7 @@ export async function updateDynamicState(
     conversationHistory?: ConversationTurn[];
     questionsAsked?: number;
     exitQuestionsAsked?: number;
+    windingDownQuestionsAsked?: number;
     fitStatus?: FitStatus;
   }
 ): Promise<void> {
