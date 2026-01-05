@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useRouter } from "next/navigation";
+// ARCHIVED: useRouter removed - no longer redirecting after interview
 import { VideoRoom } from "@/components/VideoRoom";
 import { TranscriptPanel, TranscriptMessage } from "@/components/TranscriptPanel";
 import { AIAvatar } from "@/components/AIAvatar";
@@ -66,7 +66,6 @@ interface CurrentQuestion {
 }
 
 export function InterviewRoom({ interviewToken, candidateName }: InterviewRoomProps) {
-  const router = useRouter();
   const [credentials, setCredentials] = useState<RtcCredentials | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [phase, setPhase] = useState<InterviewPhase>("not_started");
@@ -462,12 +461,8 @@ export function InterviewRoom({ interviewToken, candidateName }: InterviewRoomPr
     };
   }, []);
 
-  // Redirect to schedule page when interview completes
-  useEffect(() => {
-    if (phase === "completed") {
-      router.push(`/candidate/schedule/${interviewToken}`);
-    }
-  }, [phase, router, interviewToken]);
+  // ARCHIVED: Schedule redirect removed - interview now ends with completion screen
+  // Webhook will send results to Zapier/Airtable automatically
 
   // Derive avatar state from phase
   const avatarState = 
@@ -524,17 +519,17 @@ export function InterviewRoom({ interviewToken, candidateName }: InterviewRoomPr
   }
 
   if (phase === "completed") {
-    // Show brief loading while redirecting
     return (
       <div className="h-screen flex items-center justify-center bg-zinc-950 p-8">
-        <div className="text-center">
-          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-emerald-600 flex items-center justify-center">
-            <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div className="text-center max-w-md">
+          <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-emerald-600 flex items-center justify-center">
+            <svg className="w-10 h-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
           </div>
-          <h1 className="text-2xl font-bold text-emerald-400 mb-2">Interview Complete!</h1>
-          <p className="text-zinc-400">Redirecting to schedule your availability...</p>
+          <h1 className="text-3xl font-bold text-emerald-400 mb-3">Interview Complete!</h1>
+          <p className="text-zinc-300 text-lg mb-2">Thank you for taking the time to chat with us.</p>
+          <p className="text-zinc-500">We&apos;ll review your interview and be in touch soon.</p>
         </div>
       </div>
     );
