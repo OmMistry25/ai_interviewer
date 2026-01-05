@@ -11,6 +11,31 @@ import { AudioBuffer } from "@/lib/audio/buffer";
 import { speakText, stopSpeaking, setAudioContext } from "@/lib/audio/tts-client";
 import { initializeFillers, playRandomFiller, setFillerAudioContext } from "@/lib/audio/fillers";
 
+// Fetch with timeout - prevents hanging on slow/failed requests
+async function fetchWithTimeout(
+  url: string,
+  options: RequestInit,
+  timeoutMs: number = 45000 // 45 second default timeout
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    return response;
+  } catch (error) {
+    clearTimeout(timeoutId);
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error("Request timed out - please try again");
+    }
+    throw error;
+  }
+}
+
 interface InterviewRoomProps {
   interviewToken: string;
   candidateName: string;
@@ -116,10 +141,10 @@ export function InterviewRoom({ interviewToken, candidateName }: InterviewRoomPr
 
       let sttData;
       try {
-        const sttRes = await fetch("/api/speech/stt", {
+        const sttRes = await fetchWithTimeout("/api/speech/stt", {
           method: "POST",
           body: formData,
-        });
+        }, 30000); // 30 second timeout for STT
         sttData = await sttRes.json();
         if (!sttRes.ok) {
           throw new Error(sttData.error || "Failed to transcribe");
@@ -127,6 +152,7 @@ export function InterviewRoom({ interviewToken, candidateName }: InterviewRoomPr
       } catch (e) {
         console.error("STT error:", e);
         // On STT failure, let user try again
+        setError("Having trouble processing - please try speaking again");
         audioCaptureRef.current?.enableDetection();
         setPhase("listening");
         isProcessingRef.current = false;
@@ -144,10 +170,10 @@ export function InterviewRoom({ interviewToken, candidateName }: InterviewRoomPr
 
       addMessage("candidate", candidateAnswer);
 
-      // Send to next-turn API with retry
+      // Send to next-turn API with timeout
       let nextData;
       try {
-        const nextRes = await fetch("/api/interviews/next-turn", {
+        const nextRes = await fetchWithTimeout("/api/interviews/next-turn", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -156,14 +182,16 @@ export function InterviewRoom({ interviewToken, candidateName }: InterviewRoomPr
             followupsUsed: followupsUsedRef.current,
             currentQuestionPrompt: currentQuestionRef.current?.prompt, // For dynamic mode conversation history
           }),
-        });
+        }, 50000); // 50 second timeout for next-turn (allows for AI generation)
         nextData = await nextRes.json();
         if (!nextRes.ok) {
           throw new Error(nextData.error || "Failed to process answer");
         }
       } catch (e) {
         console.error("Next-turn error:", e);
-        setError("Connection issue - please refresh and continue");
+        setError("Taking too long - please click to retry");
+        audioCaptureRef.current?.enableDetection();
+        setPhase("listening");
         isProcessingRef.current = false;
         return;
       }

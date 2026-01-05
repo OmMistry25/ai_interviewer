@@ -438,7 +438,7 @@ async function handleHybridFlow(
   // Check if this question allows follow-ups
   if (currentQuestion.allow_followup) {
     // Decide if we should ask a follow-up
-    const { shouldFollowUp, reason } = await shouldAskFollowUp(
+    const { shouldFollowUp, reason } = shouldAskFollowUp(
       currentQuestion.prompt,
       candidateAnswer,
       config.role_context

@@ -172,63 +172,44 @@ export function getFinalClosingQuestion(): GeneratedQuestion {
 
 /**
  * Determine if a follow-up question is needed based on the answer
- * Returns true if the answer was vague, incomplete, or interesting enough to explore
+ * Uses fast heuristics only - no AI call for speed
  */
-export async function shouldAskFollowUp(
+export function shouldAskFollowUp(
   question: string,
   answer: string,
   roleContext: RoleContext | undefined
-): Promise<{ shouldFollowUp: boolean; reason: string }> {
-  // Quick heuristics first - skip AI call for obvious cases
+): { shouldFollowUp: boolean; reason: string } {
   const wordCount = answer.trim().split(/\s+/).length;
+  const answerLower = answer.toLowerCase();
   
-  // Very short answers (< 10 words) usually need follow-up
-  if (wordCount < 10) {
-    return { shouldFollowUp: true, reason: "Answer was very brief" };
+  // Very short answers (< 15 words) need follow-up
+  if (wordCount < 15) {
+    return { shouldFollowUp: true, reason: "Answer was brief" };
   }
   
-  // Very detailed answers (> 80 words) probably don't need follow-up
-  if (wordCount > 80) {
-    return { shouldFollowUp: false, reason: "Answer was comprehensive" };
+  // Check for vague/non-committal answers
+  const vaguePatterns = [
+    /^(yes|no|maybe|i guess|not really|i don't know|idk|nope|yep)\.?$/i,
+    /^(i think so|probably|possibly|sometimes)\.?$/i,
+  ];
+  
+  if (vaguePatterns.some(pattern => pattern.test(answer.trim()))) {
+    return { shouldFollowUp: true, reason: "Answer was vague" };
   }
   
-  // For medium-length answers, use AI to decide
-  const prompt = `Question: "${question}"
-Answer: "${answer}"
-
-Does this answer need a follow-up? Consider:
-- Was the answer vague or lacking specifics?
-- Did they mention something interesting worth exploring?
-- Would a follow-up help assess their fit better?
-
-Respond with JSON only: {"followUp": true/false, "reason": "brief reason"}`;
-
-  try {
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        { role: "system", content: "Decide if interview follow-up is needed. JSON only." },
-        { role: "user", content: prompt },
-      ],
-      max_tokens: 50,
-      temperature: 0.2,
-    });
-
-    const content = response.choices[0]?.message?.content?.trim() || "{}";
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      const parsed = JSON.parse(jsonMatch[0]);
-      return {
-        shouldFollowUp: parsed.followUp === true,
-        reason: parsed.reason || "AI decision",
-      };
-    }
-  } catch (e) {
-    console.error("Follow-up decision error:", e);
+  // Check if answer contains specific examples (good sign - no follow-up needed)
+  const hasSpecifics = /\d+|when i|one time|for example|at my|last year|recently/i.test(answerLower);
+  if (hasSpecifics && wordCount > 25) {
+    return { shouldFollowUp: false, reason: "Answer included specifics" };
   }
-
-  // Default: no follow-up for medium answers
-  return { shouldFollowUp: false, reason: "Default - answer was adequate" };
+  
+  // Medium-length answers (15-40 words) without specifics - follow up
+  if (wordCount < 40 && !hasSpecifics) {
+    return { shouldFollowUp: true, reason: "Could use more detail" };
+  }
+  
+  // Detailed answers (40+ words) - no follow-up needed
+  return { shouldFollowUp: false, reason: "Answer was comprehensive" };
 }
 
 /**
