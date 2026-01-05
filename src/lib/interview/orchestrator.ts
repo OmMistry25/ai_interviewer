@@ -385,11 +385,11 @@ async function triggerWebhook(
   const signals = scoresObj?.signals || {};
   
   // Determine decision based on score
-  let decision: "viable" | "not_viable" | "review" = "review";
+  let decision: "recommend" | "pass" | "hold" = "hold";
   if (totalScore >= 0.6) {
-    decision = "viable";
+    decision = "recommend";
   } else if (totalScore < 0.4) {
-    decision = "not_viable";
+    decision = "pass";
   }
   
   // Extract strengths and concerns from signals
@@ -397,11 +397,14 @@ async function triggerWebhook(
   const concerns: string[] = [];
   
   for (const [signal, data] of Object.entries(signals)) {
-    const signalName = signal.replace(/_/g, " ");
+    // Convert snake_case to Title Case (e.g., "communication" -> "Communication")
+    const signalName = signal
+      .replace(/_/g, " ")
+      .replace(/\b\w/g, (c) => c.toUpperCase());
     if (data.score >= 0.7) {
-      strengths.push(`Strong ${signalName}`);
+      strengths.push(signalName);
     } else if (data.score < 0.4) {
-      concerns.push(`Weak ${signalName}`);
+      concerns.push(signalName);
     }
   }
   
