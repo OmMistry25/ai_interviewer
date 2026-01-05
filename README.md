@@ -1,37 +1,121 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Cliq - AI Interview Platform
 
-## Getting Started
+AI-powered video interview platform that automates candidate screening with natural conversations.
 
-First, run the development server:
+## Integration API
+
+### Create Interview
+
+Create a new AI interview for a candidate. Used for Zapier/Airtable integrations.
+
+**Endpoint:** `POST https://usecliq.com/api/integrations/create-interview`
+
+**Headers:**
+```
+Content-Type: application/json
+x-api-key: YOUR_INTEGRATION_API_KEY
+```
+
+**Request Body:**
+```json
+{
+  "candidateName": "John Doe",
+  "candidatePhone": "+1234567890",
+  "candidateEmail": "john@example.com",
+  "webhookUrl": "https://hooks.zapier.com/hooks/catch/xxx"
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `candidateName` | string | Yes | Full name of the candidate |
+| `candidatePhone` | string | Yes | Phone number (for SMS tracking) |
+| `candidateEmail` | string | No | Email address |
+| `webhookUrl` | string | No | URL to POST results when interview completes |
+
+**Success Response (200):**
+```json
+{
+  "success": true,
+  "interviewId": "fb10e665-22e8-4b8c-b8e0-1db55087680d",
+  "interviewUrl": "https://usecliq.com/candidate/interview/02e4a8b8...",
+  "message": "Interview created successfully"
+}
+```
+
+**Error Responses:**
+- `401` - Invalid API key
+- `400` - Missing required fields
+- `500` - Server error
+
+**Example (cURL):**
+```bash
+curl -X POST https://usecliq.com/api/integrations/create-interview \
+  -H "Content-Type: application/json" \
+  -H "x-api-key: YOUR_API_KEY" \
+  -d '{
+    "candidateName": "Test User",
+    "candidatePhone": "+1234567890",
+    "webhookUrl": "https://hooks.zapier.com/hooks/catch/xxx"
+  }'
+```
+
+---
+
+### Webhook Callback (On Interview Completion)
+
+When an interview is completed, if a `webhookUrl` was provided, we POST the results:
+
+**Webhook Payload:**
+```json
+{
+  "interviewId": "fb10e665-22e8-4b8c-b8e0-1db55087680d",
+  "candidateName": "John Doe",
+  "candidatePhone": "+1234567890",
+  "candidateEmail": "john@example.com",
+  "status": "completed",
+  "score": 72,
+  "decision": "viable",
+  "summary": "Strong customer service skills with good availability...",
+  "strengths": [
+    "Enthusiastic about the role",
+    "Flexible schedule",
+    "Prior cafe experience"
+  ],
+  "concerns": [
+    "Limited experience with espresso machines"
+  ],
+  "interviewUrl": "https://usecliq.com/candidate/interview/02e4a8b8..."
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `score` | Overall score (0-100) |
+| `decision` | `"viable"`, `"not_viable"`, or `"review"` |
+| `strengths` | Array of positive observations |
+| `concerns` | Array of potential issues |
+| `summary` | Brief AI-generated summary |
+
+---
+
+## Environment Variables
+
+```bash
+# Required for Integration API
+INTEGRATION_API_KEY=your-secret-api-key
+YUMMY_FUTURE_TEMPLATE_ID=uuid-of-interview-template
+
+# Future: Pass templateId in request body instead of using env var
+# templateId: "uuid" (Option C - not yet implemented)
+```
+
+---
+
+## Development
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
-# ai_interviewer
+Open [http://localhost:3000](http://localhost:3000)
