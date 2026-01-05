@@ -268,10 +268,10 @@ export async function startInterview(interviewId: string): Promise<void> {
 export async function completeInterview(interviewId: string): Promise<void> {
   const adminClient = createSupabaseAdminClient();
 
-  // Get interview to check mode and dynamic state
+  // Get interview to check mode, dynamic state, and webhook info
   const { data: interviewData } = await adminClient
     .from("interviews")
-    .select("template_version_id, dynamic_state")
+    .select("template_version_id, dynamic_state, webhook_url, candidate_name, candidate_phone, candidate_email, access_token")
     .eq("id", interviewId)
     .single();
 
@@ -351,6 +351,100 @@ export async function completeInterview(interviewId: string): Promise<void> {
       .from("applications")
       .update({ status: "interviewed" })
       .eq("id", interview.application_id);
+  }
+
+  // Trigger webhook if configured (for Zapier/external integrations)
+  if (interviewData?.webhook_url) {
+    triggerWebhook(interviewId, interviewData, scores, summary).catch((e) => {
+      console.error("Webhook trigger error:", e);
+    });
+  }
+}
+
+/**
+ * Send interview results to webhook URL (for Zapier/external integrations)
+ */
+async function triggerWebhook(
+  interviewId: string,
+  interviewData: {
+    webhook_url: string;
+    candidate_name?: string;
+    candidate_phone?: string;
+    candidate_email?: string;
+    access_token?: string;
+  },
+  scores: unknown,
+  summary: string | null
+): Promise<void> {
+  const scoresObj = scores as { 
+    totalScore?: number; 
+    signals?: Record<string, { score: number }>;
+  } | null;
+  
+  const totalScore = scoresObj?.totalScore ?? 0;
+  const signals = scoresObj?.signals || {};
+  
+  // Determine decision based on score
+  let decision: "viable" | "not_viable" | "review" = "review";
+  if (totalScore >= 0.6) {
+    decision = "viable";
+  } else if (totalScore < 0.4) {
+    decision = "not_viable";
+  }
+  
+  // Extract strengths and concerns from signals
+  const strengths: string[] = [];
+  const concerns: string[] = [];
+  
+  for (const [signal, data] of Object.entries(signals)) {
+    const signalName = signal.replace(/_/g, " ");
+    if (data.score >= 0.7) {
+      strengths.push(`Strong ${signalName}`);
+    } else if (data.score < 0.4) {
+      concerns.push(`Weak ${signalName}`);
+    }
+  }
+  
+  // Build interview URL
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://usecliq.com";
+  const interviewUrl = interviewData.access_token 
+    ? `${baseUrl}/candidate/interview/${interviewData.access_token}`
+    : null;
+  
+  // Prepare webhook payload
+  const payload = {
+    interviewId,
+    candidateName: interviewData.candidate_name || "Unknown",
+    candidatePhone: interviewData.candidate_phone || null,
+    candidateEmail: interviewData.candidate_email || null,
+    status: "completed",
+    score: Math.round(totalScore * 100),
+    decision,
+    summary: summary || "No summary available",
+    strengths,
+    concerns,
+    interviewUrl,
+    completedAt: new Date().toISOString(),
+  };
+  
+  // Send to webhook
+  try {
+    const response = await fetch(interviewData.webhook_url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+    
+    if (!response.ok) {
+      console.error(`Webhook failed with status ${response.status}`);
+    } else {
+      console.log(`Webhook sent successfully for interview ${interviewId}`);
+    }
+  } catch (e) {
+    console.error("Webhook request failed:", e);
+    throw e;
   }
 }
 
