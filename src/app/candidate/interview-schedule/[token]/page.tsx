@@ -48,7 +48,7 @@ export default async function InterviewSchedulePage({ params }: { params: Params
           <div className="bg-slate-800/50 backdrop-blur rounded-xl border border-slate-700/50 p-6 text-left">
             <h3 className="text-sm font-medium text-slate-400 mb-3">Your selected times:</h3>
             <ul className="space-y-2">
-              {slots.map((slot, idx) => (
+              {slots.map((slot: string, idx: number) => (
                 <li key={idx} className="flex items-center gap-2 text-slate-300">
                   <Calendar className="w-4 h-4 text-emerald-400" />
                   {slot}
