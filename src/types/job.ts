@@ -25,3 +25,4 @@ export type CreateJobInput = z.infer<typeof createJobSchema>;
 export const updateJobSchema = jobPostingSchema.partial().omit({ org_id: true });
 export type UpdateJobInput = z.infer<typeof updateJobSchema>;
 
+

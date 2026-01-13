@@ -271,7 +271,7 @@ export async function completeInterview(interviewId: string): Promise<void> {
   // Get interview to check mode, dynamic state, and webhook info
   const { data: interviewData } = await adminClient
     .from("interviews")
-    .select("template_version_id, dynamic_state, webhook_url, candidate_name, candidate_phone, candidate_email, access_token")
+    .select("template_version_id, dynamic_state, webhook_url, candidate_name, candidate_phone, candidate_email, access_token, onsite_availability")
     .eq("id", interviewId)
     .single();
 
@@ -363,6 +363,9 @@ export async function completeInterview(interviewId: string): Promise<void> {
 
 /**
  * Send interview results to webhook URL (for Zapier/external integrations)
+ * Note: This is called twice:
+ * 1. When interview completes (schedulingPending: true, onsiteAvailability: null)
+ * 2. After candidate submits on-site availability (schedulingPending: false, onsiteAvailability: "...")
  */
 async function triggerWebhook(
   interviewId: string,
@@ -372,6 +375,7 @@ async function triggerWebhook(
     candidate_phone?: string;
     candidate_email?: string;
     access_token?: string;
+    onsite_availability?: string;
   },
   scores: unknown,
   summary: string | null
@@ -415,6 +419,8 @@ async function triggerWebhook(
     : null;
   
   // Prepare webhook payload
+  // onsiteAvailability will be null on first call, populated after candidate submits scheduling
+  const hasAvailability = !!interviewData.onsite_availability;
   const payload = {
     interviewId,
     candidateName: interviewData.candidate_name || "Unknown",
@@ -427,6 +433,8 @@ async function triggerWebhook(
     strengths,
     concerns,
     interviewUrl,
+    onsiteAvailability: interviewData.onsite_availability || null,
+    schedulingPending: !hasAvailability,
     completedAt: new Date().toISOString(),
   };
   

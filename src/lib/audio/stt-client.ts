@@ -26,3 +26,4 @@ export async function transcribeAudio(
   return data.transcript;
 }
 
+

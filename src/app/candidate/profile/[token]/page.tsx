@@ -345,3 +345,4 @@ export default async function CandidateProfilePage({ params }: { params: Params 
   );
 }
 
+

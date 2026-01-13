@@ -7,3 +7,4 @@ CREATE INDEX IF NOT EXISTS idx_interviews_dynamic_state
 ON interviews USING GIN (dynamic_state) 
 WHERE dynamic_state IS NOT NULL;
 
+

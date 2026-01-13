@@ -61,3 +61,4 @@ CREATE TRIGGER waitlist_candidates_updated_at
   FOR EACH ROW
   EXECUTE FUNCTION update_waitlist_candidates_updated_at();
 
+

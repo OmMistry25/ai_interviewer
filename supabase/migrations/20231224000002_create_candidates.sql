@@ -118,3 +118,4 @@ CREATE TRIGGER applications_updated_at
   FOR EACH ROW
   EXECUTE FUNCTION update_applications_updated_at();
 
+

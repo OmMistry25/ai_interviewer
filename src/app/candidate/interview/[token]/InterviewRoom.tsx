@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-// ARCHIVED: useRouter removed - no longer redirecting after interview
+import { useRouter } from "next/navigation";
 import { VideoRoom } from "@/components/VideoRoom";
 import { TranscriptPanel, TranscriptMessage } from "@/components/TranscriptPanel";
 import { AIAvatar } from "@/components/AIAvatar";
@@ -66,6 +66,7 @@ interface CurrentQuestion {
 }
 
 export function InterviewRoom({ interviewToken, candidateName }: InterviewRoomProps) {
+  const router = useRouter();
   const [credentials, setCredentials] = useState<RtcCredentials | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [phase, setPhase] = useState<InterviewPhase>("not_started");
@@ -518,6 +519,17 @@ export function InterviewRoom({ interviewToken, candidateName }: InterviewRoomPr
     );
   }
 
+  // Redirect to scheduling page when interview completes
+  useEffect(() => {
+    if (phase === "completed") {
+      // Small delay for the user to see completion message before redirect
+      const timer = setTimeout(() => {
+        router.push(`/candidate/interview-schedule/${interviewToken}`);
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [phase, router, interviewToken]);
+
   if (phase === "completed") {
     return (
       <div className="h-screen flex items-center justify-center bg-zinc-950 p-8">
@@ -529,7 +541,7 @@ export function InterviewRoom({ interviewToken, candidateName }: InterviewRoomPr
           </div>
           <h1 className="text-3xl font-bold text-emerald-400 mb-3">Interview Complete!</h1>
           <p className="text-zinc-300 text-lg mb-2">Thank you for taking the time to chat with us.</p>
-          <p className="text-zinc-500">We&apos;ll review your interview and be in touch soon.</p>
+          <p className="text-zinc-500 animate-pulse">Redirecting to schedule your on-site interview...</p>
         </div>
       </div>
     );
