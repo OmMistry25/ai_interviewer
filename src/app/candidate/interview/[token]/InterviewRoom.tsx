@@ -462,8 +462,16 @@ export function InterviewRoom({ interviewToken, candidateName }: InterviewRoomPr
     };
   }, []);
 
-  // ARCHIVED: Schedule redirect removed - interview now ends with completion screen
-  // Webhook will send results to Zapier/Airtable automatically
+  // Redirect to scheduling page when interview completes
+  useEffect(() => {
+    if (phase === "completed") {
+      // Small delay for the user to see completion message before redirect
+      const timer = setTimeout(() => {
+        router.push(`/candidate/interview-schedule/${interviewToken}`);
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [phase, router, interviewToken]);
 
   // Derive avatar state from phase
   const avatarState = 
@@ -518,17 +526,6 @@ export function InterviewRoom({ interviewToken, candidateName }: InterviewRoomPr
       </div>
     );
   }
-
-  // Redirect to scheduling page when interview completes
-  useEffect(() => {
-    if (phase === "completed") {
-      // Small delay for the user to see completion message before redirect
-      const timer = setTimeout(() => {
-        router.push(`/candidate/interview-schedule/${interviewToken}`);
-      }, 2000);
-      return () => clearTimeout(timer);
-    }
-  }, [phase, router, interviewToken]);
 
   if (phase === "completed") {
     return (
