@@ -49,7 +49,7 @@ export class AudioCapture {
   private ownsStream = true; // Whether we created the stream and should stop it
   private ownsContext = true; // Whether we created the AudioContext and should close it
 
-  private options: Required<Omit<AudioCaptureOptions, 'existingStream' | 'audioContext'>> & { existingStream?: MediaStream; audioContext?: AudioContext };
+  private options: Required<Omit<AudioCaptureOptions, 'existingStream' | 'audioContext' | 'enableBuffer' | 'bufferDurationMs'>> & { existingStream?: MediaStream; audioContext?: AudioContext };
   private isSilent = true;
   private silenceStartTime: number | null = null;
   private lastProgressUpdate = 0;
