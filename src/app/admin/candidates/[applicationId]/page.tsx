@@ -5,7 +5,7 @@ import { redirect, notFound } from "next/navigation";
 import { DecisionButtons } from "./DecisionButtons";
 import { Card, CardHeader } from "@/components/ui/Card";
 import { StatusBadge, Badge } from "@/components/ui/Badge";
-import { ArrowLeft, FileText, BarChart3, MessageSquare, Brain, CheckCircle, AlertTriangle, GraduationCap, Star, Calendar, Clock, Flag, ThumbsUp, ThumbsDown } from "lucide-react";
+import { ArrowLeft, FileText, BarChart3, MessageSquare, Brain, CheckCircle, AlertTriangle, GraduationCap, Star, Calendar, Clock, Flag, ThumbsUp, ThumbsDown, Play } from "lucide-react";
 
 interface Props {
   params: Promise<{ applicationId: string }>;
@@ -86,6 +86,7 @@ export default async function CandidateDetailPage({ params }: Props) {
     description: string;
     quote: string | null;
     clip_path: string | null;
+    clip_url: string | null;
   }> = [];
 
   if (interview?.id) {
@@ -95,7 +96,21 @@ export default async function CandidateDetailPage({ params }: Props) {
       .eq("interview_id", interview.id)
       .order("turn_index", { ascending: true });
     
-    interviewFlags = (flags || []) as typeof interviewFlags;
+    // Generate signed URLs for clips
+    const flagsWithUrls = await Promise.all(
+      (flags || []).map(async (flag) => {
+        let clip_url: string | null = null;
+        if (flag.clip_path) {
+          const { data: signedUrl } = await supabase.storage
+            .from("interview-clips")
+            .createSignedUrl(flag.clip_path, 3600); // 1 hour expiry
+          clip_url = signedUrl?.signedUrl || null;
+        }
+        return { ...flag, clip_url } as typeof interviewFlags[0];
+      })
+    );
+    
+    interviewFlags = flagsWithUrls;
   }
 
   const redFlags = interviewFlags.filter(f => f.flag_type === "red");
@@ -387,6 +402,18 @@ export default async function CandidateDetailPage({ params }: Props) {
                               &ldquo;{flag.quote}&rdquo;
                             </p>
                           )}
+                          {flag.clip_url && (
+                            <div className="mt-3">
+                              <audio
+                                controls
+                                className="h-8 w-full max-w-xs"
+                                preload="none"
+                              >
+                                <source src={flag.clip_url} type="audio/wav" />
+                                Your browser does not support audio playback.
+                              </audio>
+                            </div>
+                          )}
                         </div>
                         <span className="text-xs text-slate-600 whitespace-nowrap">
                           Q{flag.turn_index + 1}
@@ -421,6 +448,18 @@ export default async function CandidateDetailPage({ params }: Props) {
                             <p className="text-xs text-slate-500 mt-2 italic">
                               &ldquo;{flag.quote}&rdquo;
                             </p>
+                          )}
+                          {flag.clip_url && (
+                            <div className="mt-3">
+                              <audio
+                                controls
+                                className="h-8 w-full max-w-xs"
+                                preload="none"
+                              >
+                                <source src={flag.clip_url} type="audio/wav" />
+                                Your browser does not support audio playback.
+                              </audio>
+                            </div>
                           )}
                         </div>
                         <span className="text-xs text-slate-600 whitespace-nowrap">
