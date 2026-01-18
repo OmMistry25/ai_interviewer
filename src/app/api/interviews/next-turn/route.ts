@@ -30,6 +30,7 @@ import {
   ConversationTurn,
 } from "@/lib/interview/question-generator";
 import { assessCandidateFit, shouldExitGracefully } from "@/lib/interview/fit-assessor";
+import { detectAndStoreFlagBackground } from "@/lib/interview/flag-detector";
 
 // Extend timeout for this route (Vercel Pro: 60s max)
 export const maxDuration = 60;
@@ -117,6 +118,15 @@ async function handleStaticFlow(
     evaluation.score
   );
 
+  // Fire-and-forget: Detect and store flags for this Q&A turn
+  detectAndStoreFlagBackground(
+    state.interviewId,
+    state.currentQuestionIndex,
+    currentQuestion.prompt,
+    candidateAnswer,
+    state.config.role_context
+  ).catch(() => {}); // Extra safety - never throw
+
   const maxFollowups = state.config.policies?.max_followups_per_question ?? 1;
 
   // Check for follow-up
@@ -199,6 +209,15 @@ async function handleDynamicFlow(
     questionPrompt,
     candidateAnswer
   );
+
+  // Fire-and-forget: Detect and store flags for this Q&A turn
+  detectAndStoreFlagBackground(
+    state.interviewId,
+    questionsAsked, // Turn index = questions asked so far
+    questionPrompt,
+    candidateAnswer,
+    config.role_context
+  ).catch(() => {}); // Extra safety - never throw
 
   // Update questions asked count
   const newQuestionsAsked = questionsAsked + 1;
@@ -402,6 +421,15 @@ async function handleHybridFlow(
     ...conversationHistory,
     { question: questionPrompt, answer: candidateAnswer },
   ];
+
+  // Fire-and-forget: Detect and store flags for this Q&A turn
+  detectAndStoreFlagBackground(
+    state.interviewId,
+    currentIndex,
+    questionPrompt,
+    candidateAnswer,
+    config.role_context
+  ).catch(() => {}); // Extra safety - never throw
   
   // If we already asked a follow-up for this question, move to next main question
   if (askedFollowUp) {

@@ -5,7 +5,7 @@ import { redirect, notFound } from "next/navigation";
 import { DecisionButtons } from "./DecisionButtons";
 import { Card, CardHeader } from "@/components/ui/Card";
 import { StatusBadge, Badge } from "@/components/ui/Badge";
-import { ArrowLeft, FileText, BarChart3, MessageSquare, Brain, CheckCircle, AlertTriangle, GraduationCap, Star, Calendar, Clock } from "lucide-react";
+import { ArrowLeft, FileText, BarChart3, MessageSquare, Brain, CheckCircle, AlertTriangle, GraduationCap, Star, Calendar, Clock, Flag, ThumbsUp, ThumbsDown } from "lucide-react";
 
 interface Props {
   params: Promise<{ applicationId: string }>;
@@ -76,6 +76,30 @@ export default async function CandidateDetailPage({ params }: Props) {
     summary: string | null;
   }> | null;
   const interview = interviews?.[0];
+
+  // Fetch interview flags if we have an interview
+  let interviewFlags: Array<{
+    id: string;
+    turn_index: number;
+    flag_type: "red" | "green";
+    category: string;
+    description: string;
+    quote: string | null;
+    clip_path: string | null;
+  }> = [];
+
+  if (interview?.id) {
+    const { data: flags } = await supabase
+      .from("interview_flags")
+      .select("id, turn_index, flag_type, category, description, quote, clip_path")
+      .eq("interview_id", interview.id)
+      .order("turn_index", { ascending: true });
+    
+    interviewFlags = (flags || []) as typeof interviewFlags;
+  }
+
+  const redFlags = interviewFlags.filter(f => f.flag_type === "red");
+  const greenFlags = interviewFlags.filter(f => f.flag_type === "green");
   
   // Extract signal scores for display
   const signalScores = interview?.scores?.signals
@@ -315,6 +339,99 @@ export default async function CandidateDetailPage({ params }: Props) {
                 </div>
               ))}
             </div>
+          </Card>
+        )}
+
+        {/* Interview Observations (Flags) */}
+        {interviewFlags.length > 0 && (
+          <Card className="mb-6">
+            <CardHeader title="Interview Observations" icon={<Flag className="w-5 h-5" />} />
+            
+            {/* Summary counts */}
+            <div className="flex gap-4 mb-5">
+              {greenFlags.length > 0 && (
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-500/10 rounded-lg border border-emerald-500/20">
+                  <ThumbsUp className="w-4 h-4 text-emerald-400" />
+                  <span className="text-sm font-medium text-emerald-400">{greenFlags.length} Positive</span>
+                </div>
+              )}
+              {redFlags.length > 0 && (
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-red-500/10 rounded-lg border border-red-500/20">
+                  <ThumbsDown className="w-4 h-4 text-red-400" />
+                  <span className="text-sm font-medium text-red-400">{redFlags.length} Concern{redFlags.length > 1 ? 's' : ''}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Green flags first */}
+            {greenFlags.length > 0 && (
+              <div className="mb-5">
+                <p className="text-xs text-slate-500 mb-3 flex items-center gap-2">
+                  <ThumbsUp className="w-3 h-3 text-emerald-500" />
+                  Positive Signals
+                </p>
+                <div className="space-y-3">
+                  {greenFlags.map((flag) => (
+                    <div
+                      key={flag.id}
+                      className="p-4 rounded-lg bg-emerald-500/5 border border-emerald-500/20"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1">
+                          <p className="text-xs text-emerald-400 font-medium mb-1 capitalize">
+                            {flag.category.replace(/_/g, " ")}
+                          </p>
+                          <p className="text-sm text-slate-300">{flag.description}</p>
+                          {flag.quote && (
+                            <p className="text-xs text-slate-500 mt-2 italic">
+                              &ldquo;{flag.quote}&rdquo;
+                            </p>
+                          )}
+                        </div>
+                        <span className="text-xs text-slate-600 whitespace-nowrap">
+                          Q{flag.turn_index + 1}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Red flags */}
+            {redFlags.length > 0 && (
+              <div>
+                <p className="text-xs text-slate-500 mb-3 flex items-center gap-2">
+                  <ThumbsDown className="w-3 h-3 text-red-500" />
+                  Areas of Concern
+                </p>
+                <div className="space-y-3">
+                  {redFlags.map((flag) => (
+                    <div
+                      key={flag.id}
+                      className="p-4 rounded-lg bg-red-500/5 border border-red-500/20"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1">
+                          <p className="text-xs text-red-400 font-medium mb-1 capitalize">
+                            {flag.category.replace(/_/g, " ")}
+                          </p>
+                          <p className="text-sm text-slate-300">{flag.description}</p>
+                          {flag.quote && (
+                            <p className="text-xs text-slate-500 mt-2 italic">
+                              &ldquo;{flag.quote}&rdquo;
+                            </p>
+                          )}
+                        </div>
+                        <span className="text-xs text-slate-600 whitespace-nowrap">
+                          Q{flag.turn_index + 1}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </Card>
         )}
 

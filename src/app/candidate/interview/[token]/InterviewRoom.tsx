@@ -93,6 +93,60 @@ export function InterviewRoom({ interviewToken, candidateName }: InterviewRoomPr
   useEffect(() => { currentQuestionRef.current = currentQuestion; }, [currentQuestion]);
   useEffect(() => { followupsUsedRef.current = followupsUsed; }, [followupsUsed]);
 
+  // Clip upload polling - uploads audio clips for flagged moments (fire-and-forget)
+  const uploadPendingClipsRef = useRef(false); // Prevent concurrent uploads
+  
+  useEffect(() => {
+    // Only poll during active interview phases
+    if (!credentials?.interviewId) return;
+    if (phase === "not_started" || phase === "completed") return;
+
+    const pollInterval = setInterval(async () => {
+      // Skip if already uploading or no audio capture
+      if (uploadPendingClipsRef.current || !audioCaptureRef.current) return;
+      
+      try {
+        uploadPendingClipsRef.current = true;
+        
+        // Check for pending clips
+        const res = await fetch(`/api/interviews/${credentials.interviewId}/pending-clips`);
+        if (!res.ok) {
+          uploadPendingClipsRef.current = false;
+          return;
+        }
+        
+        const data = await res.json();
+        if (!data.pendingClips || data.pendingClips.length === 0) {
+          uploadPendingClipsRef.current = false;
+          return;
+        }
+
+        // Upload clips for each pending flag (get last 60s of audio for each)
+        for (const pending of data.pendingClips) {
+          const clipBlob = audioCaptureRef.current?.exportAsWav(60000); // Last 60 seconds
+          if (!clipBlob) continue;
+
+          const formData = new FormData();
+          formData.append("flagId", pending.id);
+          formData.append("audio", clipBlob, "clip.wav");
+          formData.append("durationMs", "60000");
+
+          // Fire and forget - don't block on upload
+          fetch(`/api/interviews/${credentials.interviewId}/clips`, {
+            method: "POST",
+            body: formData,
+          }).catch(() => {}); // Ignore errors silently
+        }
+      } catch {
+        // Silently ignore polling errors - should never affect interview
+      } finally {
+        uploadPendingClipsRef.current = false;
+      }
+    }, 10000); // Poll every 10 seconds
+
+    return () => clearInterval(pollInterval);
+  }, [credentials?.interviewId, phase]);
+
   const addMessage = useCallback((speaker: "interviewer" | "candidate", text: string) => {
     setMessages((prev) => [...prev, { speaker, text, timestamp: new Date() }]);
   }, []);
@@ -220,6 +274,30 @@ export function InterviewRoom({ interviewToken, candidateName }: InterviewRoomPr
 
         setPhase("completed");
         isProcessingRef.current = false;
+        
+        // Final clip upload attempt (fire-and-forget)
+        if (creds?.interviewId && audioCaptureRef.current) {
+          fetch(`/api/interviews/${creds.interviewId}/pending-clips`)
+            .then(res => res.json())
+            .then(data => {
+              if (data.pendingClips?.length > 0) {
+                for (const pending of data.pendingClips) {
+                  const clipBlob = audioCaptureRef.current?.exportAsWav(60000);
+                  if (!clipBlob) continue;
+                  const formData = new FormData();
+                  formData.append("flagId", pending.id);
+                  formData.append("audio", clipBlob, "clip.wav");
+                  formData.append("durationMs", "60000");
+                  fetch(`/api/interviews/${creds.interviewId}/clips`, {
+                    method: "POST",
+                    body: formData,
+                  }).catch(() => {});
+                }
+              }
+            })
+            .catch(() => {});
+        }
+        
         return;
       }
 
@@ -337,6 +415,8 @@ export function InterviewRoom({ interviewToken, candidateName }: InterviewRoomPr
     const capture = new AudioCapture({
       existingStream: stream,
       audioContext: audioContextRef.current ?? undefined, // Pass pre-created context for iOS
+      enableBuffer: true, // Enable 120s rolling buffer for clip extraction
+      bufferDurationMs: 120000, // 120 seconds
       onAudioData: (pcm) => {
         audioBufferRef.current?.addChunk(pcm);
       },

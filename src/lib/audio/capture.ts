@@ -3,9 +3,19 @@
  * Supports smart pause detection with visual feedback and interruption handling
  */
 
+// Buffer chunk with timestamp for rolling buffer
+interface AudioChunk {
+  data: Float32Array;
+  timestamp: number;
+}
+
 export interface AudioCaptureOptions {
   sampleRate?: number;
   onAudioData?: (pcmData: Float32Array) => void;
+  /** Enable audio buffering for clip extraction (default: false) */
+  enableBuffer?: boolean;
+  /** Buffer duration in milliseconds (default: 120000 = 120 seconds) */
+  bufferDurationMs?: number;
   /** Called when silence is first detected (after speaking) */
   onSilenceStart?: () => void;
   /** Called when user starts speaking after silence */
@@ -50,6 +60,12 @@ export class AudioCapture {
   private speechStartTime: number | null = null; // When current speech segment started
   private cumulativeSpeechMs = 0; // Total speech time for this answer
 
+  // Audio buffer for clip extraction (Phase 5)
+  private audioBuffer: AudioChunk[] = [];
+  private bufferEnabled = false;
+  private bufferDurationMs = 120000; // 120 seconds default
+  private interviewStartTime: number | null = null; // Track when interview started for clip timestamps
+
   constructor(options: AudioCaptureOptions = {}) {
     this.options = {
       sampleRate: options.sampleRate ?? 16000,
@@ -66,6 +82,10 @@ export class AudioCapture {
       existingStream: options.existingStream,
       audioContext: options.audioContext,
     };
+    
+    // Initialize buffer settings
+    this.bufferEnabled = options.enableBuffer ?? false;
+    this.bufferDurationMs = options.bufferDurationMs ?? 120000;
   }
 
   async start(): Promise<void> {
@@ -120,6 +140,11 @@ export class AudioCapture {
 
         // Send audio data
         this.options.onAudioData(pcmData);
+
+        // Add to buffer if enabled
+        if (this.bufferEnabled) {
+          this.addToBuffer(pcmData);
+        }
 
         // Check for silence/speech
         this.detectSilence(pcmData);
@@ -283,9 +308,183 @@ export class AudioCapture {
     }
     this.stream = null;
     this.resetPauseDetection();
+    this.clearBuffer();
   }
 
   isCapturing(): boolean {
     return this.audioContext !== null;
+  }
+
+  // ============================================================
+  // AUDIO BUFFER METHODS (for clip extraction)
+  // ============================================================
+
+  /**
+   * Add audio chunk to the rolling buffer
+   * Automatically removes old chunks beyond bufferDurationMs
+   */
+  private addToBuffer(pcmData: Float32Array): void {
+    const now = Date.now();
+    
+    // Set interview start time on first chunk
+    if (this.interviewStartTime === null) {
+      this.interviewStartTime = now;
+    }
+
+    // Add new chunk with copy of data (original may be reused)
+    this.audioBuffer.push({
+      data: new Float32Array(pcmData),
+      timestamp: now,
+    });
+
+    // Remove old chunks beyond buffer duration
+    const cutoffTime = now - this.bufferDurationMs;
+    while (this.audioBuffer.length > 0 && this.audioBuffer[0].timestamp < cutoffTime) {
+      this.audioBuffer.shift();
+    }
+  }
+
+  /**
+   * Enable or disable audio buffering
+   */
+  setBufferEnabled(enabled: boolean): void {
+    this.bufferEnabled = enabled;
+    if (!enabled) {
+      this.clearBuffer();
+    }
+  }
+
+  /**
+   * Check if buffering is enabled
+   */
+  isBufferEnabled(): boolean {
+    return this.bufferEnabled;
+  }
+
+  /**
+   * Clear the audio buffer
+   */
+  clearBuffer(): void {
+    this.audioBuffer = [];
+  }
+
+  /**
+   * Get the current buffer size in milliseconds
+   */
+  getBufferDurationMs(): number {
+    if (this.audioBuffer.length < 2) return 0;
+    const first = this.audioBuffer[0].timestamp;
+    const last = this.audioBuffer[this.audioBuffer.length - 1].timestamp;
+    return last - first;
+  }
+
+  /**
+   * Get recent audio from the buffer
+   * @param durationMs How many milliseconds of audio to get (from the end)
+   * @returns Float32Array of combined audio samples, or null if buffer empty
+   */
+  getRecentAudio(durationMs: number): Float32Array | null {
+    if (this.audioBuffer.length === 0) {
+      return null;
+    }
+
+    const now = Date.now();
+    const cutoffTime = now - durationMs;
+
+    // Filter chunks within the requested duration
+    const relevantChunks = this.audioBuffer.filter(
+      chunk => chunk.timestamp >= cutoffTime
+    );
+
+    if (relevantChunks.length === 0) {
+      return null;
+    }
+
+    // Calculate total length
+    const totalLength = relevantChunks.reduce(
+      (sum, chunk) => sum + chunk.data.length, 
+      0
+    );
+
+    // Combine all chunks
+    const combined = new Float32Array(totalLength);
+    let offset = 0;
+    for (const chunk of relevantChunks) {
+      combined.set(chunk.data, offset);
+      offset += chunk.data.length;
+    }
+
+    return combined;
+  }
+
+  /**
+   * Export audio as a WAV Blob for upload
+   * @param durationMs Duration of audio to export (from end of buffer)
+   * @returns WAV Blob ready for upload, or null if no audio
+   */
+  exportAsWav(durationMs: number): Blob | null {
+    const audio = this.getRecentAudio(durationMs);
+    if (!audio) {
+      return null;
+    }
+
+    return this.encodeWav(audio, this.options.sampleRate);
+  }
+
+  /**
+   * Encode Float32Array PCM data as WAV
+   */
+  private encodeWav(samples: Float32Array, sampleRate: number): Blob {
+    const buffer = new ArrayBuffer(44 + samples.length * 2);
+    const view = new DataView(buffer);
+
+    // WAV header
+    const writeString = (offset: number, string: string) => {
+      for (let i = 0; i < string.length; i++) {
+        view.setUint8(offset + i, string.charCodeAt(i));
+      }
+    };
+
+    writeString(0, 'RIFF');
+    view.setUint32(4, 36 + samples.length * 2, true);
+    writeString(8, 'WAVE');
+    writeString(12, 'fmt ');
+    view.setUint32(16, 16, true); // Subchunk1Size
+    view.setUint16(20, 1, true); // AudioFormat (PCM)
+    view.setUint16(22, 1, true); // NumChannels (mono)
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * 2, true); // ByteRate
+    view.setUint16(32, 2, true); // BlockAlign
+    view.setUint16(34, 16, true); // BitsPerSample
+    writeString(36, 'data');
+    view.setUint32(40, samples.length * 2, true);
+
+    // Convert float samples to 16-bit PCM
+    let offset = 44;
+    for (let i = 0; i < samples.length; i++) {
+      const s = Math.max(-1, Math.min(1, samples[i]));
+      view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+      offset += 2;
+    }
+
+    return new Blob([buffer], { type: 'audio/wav' });
+  }
+
+  /**
+   * Get time elapsed since interview started (for clip timestamps)
+   */
+  getElapsedTimeMs(): number {
+    if (this.interviewStartTime === null) {
+      return 0;
+    }
+    return Date.now() - this.interviewStartTime;
+  }
+
+  /**
+   * Mark the start of a new interview (resets timing)
+   */
+  markInterviewStart(): void {
+    this.interviewStartTime = Date.now();
+    this.clearBuffer();
   }
 }
