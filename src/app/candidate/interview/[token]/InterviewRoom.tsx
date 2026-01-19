@@ -93,9 +93,9 @@ export function InterviewRoom({ interviewToken, candidateName }: InterviewRoomPr
   useEffect(() => { currentQuestionRef.current = currentQuestion; }, [currentQuestion]);
   useEffect(() => { followupsUsedRef.current = followupsUsed; }, [followupsUsed]);
 
-  // NOTE: Audio clip capture is DISABLED to ensure zero performance impact during interviews
-  // Flags are still detected and stored, but audio clips are not captured
-  // TODO: Implement server-side audio recording if clips are needed in the future
+  // NOTE: Audio clips are now captured SERVER-SIDE in the STT endpoint (zero client impact)
+  // The turnIndex is passed to STT, which saves audio to temp storage
+  // When a flag is detected, the audio is moved to permanent clips storage
 
   const addMessage = useCallback((speaker: "interviewer" | "candidate", text: string) => {
     setMessages((prev) => [...prev, { speaker, text, timestamp: new Date() }]);
@@ -142,6 +142,10 @@ export function InterviewRoom({ interviewToken, candidateName }: InterviewRoomPr
       const formData = new FormData();
       formData.append("audio", wavBlob, "audio.wav");
       formData.append("interviewId", creds.interviewId);
+      // Pass turnIndex for server-side audio clip storage
+      if (currentQuestionRef.current?.index !== undefined) {
+        formData.append("turnIndex", String(currentQuestionRef.current.index));
+      }
 
       let sttData;
       try {

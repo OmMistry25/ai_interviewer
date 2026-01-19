@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { autoDecide } from "@/lib/interview/scoring";
 import { completeInterview } from "@/lib/interview/orchestrator";
+import { updateFlagsSummary, cleanupTempAudio } from "@/lib/interview/flag-detector";
 
 // Extend timeout for scoring (Vercel Pro: 60s max)
 export const maxDuration = 60;
@@ -85,6 +86,10 @@ export async function POST(request: NextRequest) {
         .update({ status: "interviewed" })
         .eq("id", interview.application_id);
     }
+
+    // Fire-and-forget: Update flags summary and clean up temp audio
+    updateFlagsSummary(interviewId).catch(() => {});
+    cleanupTempAudio(interviewId).catch(() => {});
 
     return NextResponse.json({
       scores: evaluation.scores,

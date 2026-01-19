@@ -120,7 +120,60 @@ If neutral (most cases), respond:
 }
 
 /**
- * Store a flag in the database
+ * Move audio from temp storage to permanent clip storage
+ * Fire-and-forget - errors are logged, not thrown
+ */
+async function moveAudioToClip(
+  interviewId: string,
+  turnIndex: number,
+  flagId: string
+): Promise<string | null> {
+  try {
+    const adminClient = createSupabaseAdminClient();
+    const tempPath = `temp-audio/${interviewId}/${turnIndex}.wav`;
+    const clipPath = `clips/${interviewId}/${flagId}.wav`;
+
+    // Download from temp
+    const { data: audioData, error: downloadError } = await adminClient.storage
+      .from("interview-clips")
+      .download(tempPath);
+
+    if (downloadError) {
+      // Temp file might not exist yet (race condition) or was already cleaned up
+      console.log(`[FlagDetector] Temp audio not found: ${tempPath}`, downloadError.message);
+      return null;
+    }
+
+    // Upload to permanent location
+    const arrayBuffer = await audioData.arrayBuffer();
+    const { error: uploadError } = await adminClient.storage
+      .from("interview-clips")
+      .upload(clipPath, arrayBuffer, {
+        contentType: "audio/wav",
+        upsert: true,
+      });
+
+    if (uploadError) {
+      console.error("[FlagDetector] Failed to upload clip:", uploadError.message);
+      return null;
+    }
+
+    // Delete temp file (fire-and-forget)
+    adminClient.storage
+      .from("interview-clips")
+      .remove([tempPath])
+      .catch(() => {}); // Ignore deletion errors
+
+    console.log(`[FlagDetector] Moved audio clip: ${tempPath} -> ${clipPath}`);
+    return clipPath;
+  } catch (error) {
+    console.error("[FlagDetector] Error moving audio to clip:", error);
+    return null;
+  }
+}
+
+/**
+ * Store a flag in the database and move audio clip if available
  * Fire-and-forget - errors are logged, not thrown
  */
 export async function storeFlag(
@@ -143,7 +196,7 @@ export async function storeFlag(
         quote: flag.quote,
         question_text: questionText,
         answer_text: answerText,
-        // clip_path will be updated later when audio is uploaded
+        // clip_path will be updated after we move the audio
       })
       .select("id")
       .single();
@@ -153,7 +206,23 @@ export async function storeFlag(
       return null;
     }
 
-    return data?.id || null;
+    const flagId = data?.id;
+    if (!flagId) return null;
+
+    // Try to move audio clip (fire-and-forget, doesn't block flag storage)
+    // Use a small delay to give STT time to save the audio first
+    setTimeout(async () => {
+      const clipPath = await moveAudioToClip(interviewId, flag.turnIndex, flagId);
+      if (clipPath) {
+        // Update flag with clip path
+        await adminClient
+          .from("interview_flags")
+          .update({ clip_path: clipPath })
+          .eq("id", flagId);
+      }
+    }, 2000); // 2 second delay
+
+    return flagId;
   } catch (error) {
     console.error("[FlagDetector] Error storing flag:", error);
     return null;
@@ -194,6 +263,28 @@ export async function updateFlagsSummary(interviewId: string): Promise<void> {
 }
 
 /**
+ * Delete temp audio file - used when no flag is detected
+ * Fire-and-forget - errors are logged, not thrown
+ */
+async function deleteTempAudio(
+  interviewId: string,
+  turnIndex: number
+): Promise<void> {
+  try {
+    const adminClient = createSupabaseAdminClient();
+    const tempPath = `temp-audio/${interviewId}/${turnIndex}.wav`;
+
+    await adminClient.storage
+      .from("interview-clips")
+      .remove([tempPath]);
+    
+    console.log(`[FlagDetector] Deleted temp audio (no flag): ${tempPath}`);
+  } catch (error) {
+    // Ignore errors - cleanup will handle orphaned files
+  }
+}
+
+/**
  * Main function to detect and store flags for a turn
  * This is the function called from the interview flow (fire-and-forget)
  * 
@@ -213,6 +304,12 @@ export async function detectAndStoreFlagBackground(
     if (flag) {
       await storeFlag(interviewId, flag, question, answer);
       console.log(`[FlagDetector] ${flag.flagType.toUpperCase()} flag stored for interview ${interviewId}, turn ${turnIndex}`);
+    } else {
+      // No flag detected - delete temp audio to save storage
+      // Delay to ensure STT has finished saving the file
+      setTimeout(() => {
+        deleteTempAudio(interviewId, turnIndex).catch(() => {});
+      }, 5000); // 5 second delay
     }
   } catch (error) {
     // Catch-all safety net - should never reach here, but just in case
@@ -279,5 +376,37 @@ export async function updateFlagClipPath(
     return false;
   }
 }
+
+/**
+ * Clean up all temp audio files for a given interview
+ * Call this at interview end as a safety net
+ */
+export async function cleanupTempAudio(interviewId: string): Promise<void> {
+  try {
+    const adminClient = createSupabaseAdminClient();
+    const tempPrefix = `temp-audio/${interviewId}/`;
+
+    // List all files in temp folder for this interview
+    const { data: files, error: listError } = await adminClient.storage
+      .from("interview-clips")
+      .list(`temp-audio/${interviewId}`);
+
+    if (listError || !files || files.length === 0) {
+      return; // No files to clean up
+    }
+
+    // Delete all temp files
+    const filesToDelete = files.map(f => `${tempPrefix}${f.name}`);
+    await adminClient.storage
+      .from("interview-clips")
+      .remove(filesToDelete);
+
+    console.log(`[FlagDetector] Cleaned up ${filesToDelete.length} temp audio files for interview ${interviewId}`);
+  } catch (error) {
+    console.error("[FlagDetector] Error cleaning up temp audio:", error);
+  }
+}
+
+
 
 
